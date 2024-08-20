@@ -1,6 +1,6 @@
 package demo
 
-type Dog struct {
+type dog struct {
 	Name string
 	Age  int
 }

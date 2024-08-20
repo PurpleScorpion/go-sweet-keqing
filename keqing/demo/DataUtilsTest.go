@@ -6,9 +6,9 @@ import (
 	"github.com/PurpleScorpion/go-sweet-keqing/keqing"
 )
 
-func Test() {
-	demo14()
-}
+//func Test() {
+//	demo14()
+//}
 
 func demo14() {
 	intSlice1 := []int{12, 85, 96, 45, 62, 9, 27, 31, 55, 77}
@@ -121,11 +121,11 @@ func demo8() {
 
 	fmt.Println(keqing.ToString(arr))
 
-	var dog = Dog{
+	var obj = dog{
 		Age:  1,
 		Name: "dog",
 	}
-	fmt.Println(keqing.ToString(dog))
+	fmt.Println(keqing.ToString(obj))
 }
 
 func demo7() {
@@ -234,11 +234,11 @@ func demo1() {
 	fmt.Println("nil值的变量-非空....", keqing.IsEmpty(err))
 	fmt.Println("nil值的变量-空....", keqing.IsEmpty(getNilError()))
 
-	var dog = Dog{
+	var obj = dog{
 		Age:  1,
 		Name: "dog",
 	}
-	fmt.Println("结构体....", keqing.IsEmpty(dog))
+	fmt.Println("结构体....", keqing.IsEmpty(obj))
 }
 
 func demo2() {
