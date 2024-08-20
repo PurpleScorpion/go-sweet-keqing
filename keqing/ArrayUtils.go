@@ -44,6 +44,17 @@ func GetOne[T comparable](arr []T) (T, bool) {
 }
 
 /*
+反转数组
+*/
+func Reverse[T any](s []T) []T {
+	reversed := make([]T, len(s))
+	for i, v := range s {
+		reversed[len(s)-1-i] = v
+	}
+	return reversed
+}
+
+/*
 两个数组取差集
 */
 func Difference[T comparable](a, b []T) []T {
