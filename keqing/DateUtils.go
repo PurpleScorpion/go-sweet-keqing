@@ -93,35 +93,35 @@ func ParseDate(dateStr string, format string) time.Time {
 	return date
 }
 
-func TimeAddSecond(date time.Time, seconds int64) time.Time {
+func DateAddSecond(date time.Time, seconds int64) time.Time {
 	return date.Add(time.Duration(seconds) * time.Second)
 }
 
-func TimeAddMinute(date time.Time, minute int64) time.Time {
+func DateAddMinute(date time.Time, minute int64) time.Time {
 	return date.Add(time.Duration(minute) * time.Minute)
 }
 
-func TimeAddHour(date time.Time, hour int64) time.Time {
+func DateAddHour(date time.Time, hour int64) time.Time {
 	return date.Add(time.Duration(hour) * time.Hour)
 }
 
-func TimeAddDay(date time.Time, day int64) time.Time {
+func DateAddDay(date time.Time, day int64) time.Time {
 	return date.Add(time.Duration(day) * time.Hour * 24)
 }
 
-func TimeSubSecond(date time.Time, seconds int64) time.Time {
-	return TimeAddSecond(date, seconds*-1)
+func DateSubSecond(date time.Time, seconds int64) time.Time {
+	return DateAddSecond(date, seconds*-1)
 }
-func TimeSubMinute(date time.Time, minute int64) time.Time {
-	return TimeAddMinute(date, minute*-1)
-}
-
-func TimeSubHour(date time.Time, hour int64) time.Time {
-	return TimeAddHour(date, hour*-1)
+func DateSubMinute(date time.Time, minute int64) time.Time {
+	return DateAddMinute(date, minute*-1)
 }
 
-func TimeSubDay(date time.Time, day int64) time.Time {
-	return TimeAddDay(date, day*-1)
+func DateSubHour(date time.Time, hour int64) time.Time {
+	return DateAddHour(date, hour*-1)
+}
+
+func DateSubDay(date time.Time, day int64) time.Time {
+	return DateAddDay(date, day*-1)
 }
 
 func ParseUTC(utc string) time.Time {

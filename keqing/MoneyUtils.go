@@ -62,7 +62,9 @@ func YuanMul(a string, b float64) string {
 将元除以一个浮点数
 */
 func YuanDiv(a string, b float64) string {
-
+	if b == 0 {
+		panic("The divisor cannot be 0")
+	}
 	var sum = float64(Yuan2Fen(a)) / b
 	return Fen2Yuan(int64(sum))
 }

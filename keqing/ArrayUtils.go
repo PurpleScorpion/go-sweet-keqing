@@ -2,8 +2,10 @@ package keqing
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
 	"sort"
+	"time"
 )
 
 /*
@@ -41,6 +43,17 @@ func GetOne[T comparable](arr []T) (T, bool) {
 	}
 	var zero T
 	return zero, false
+}
+
+/*
+随机打乱数组
+*/
+func Shuffle[T any](slice []T) {
+	rand.Seed(time.Now().UnixNano()) // 初始化随机数生成器
+	for i := len(slice) - 1; i > 0; i-- {
+		j := rand.Intn(i + 1)                   // 生成 [0, i] 范围内的随机索引
+		slice[i], slice[j] = slice[j], slice[i] // 交换元素
+	}
 }
 
 /*
