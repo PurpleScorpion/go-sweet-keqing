@@ -121,11 +121,11 @@ func demo8() {
 
 	fmt.Println(keqing.ToString(arr))
 
-	var obj = dog{
-		Age:  1,
-		Name: "dog",
-	}
-	fmt.Println(keqing.ToString(obj))
+	//var obj = dog{
+	//	Age:  1,
+	//	Name: "dog",
+	//}
+	//fmt.Println(keqing.ToString(obj))
 }
 
 func demo7() {
@@ -234,11 +234,11 @@ func demo1() {
 	fmt.Println("nil值的变量-非空....", keqing.IsEmpty(err))
 	fmt.Println("nil值的变量-空....", keqing.IsEmpty(getNilError()))
 
-	var obj = dog{
-		Age:  1,
-		Name: "dog",
-	}
-	fmt.Println("结构体....", keqing.IsEmpty(obj))
+	//var obj = dog{
+	//	Age:  1,
+	//	Name: "dog",
+	//}
+	//fmt.Println("结构体....", keqing.IsEmpty(obj))
 }
 
 func demo2() {
