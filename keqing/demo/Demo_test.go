@@ -4,11 +4,65 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PurpleScorpion/go-sweet-keqing/keqing"
+	"testing"
 )
 
-//func Test() {
-//	demo14()
-//}
+func TestDemo17(t *testing.T) {
+	keqing.RsaLoadKey("D:\\img\\publicKey.pem", "D:\\img\\privateKey.pem", keqing.RSA_KEY_FILE_TYPE)
+	str := keqing.RsaEncrypt("剑光如我,斩尽牛杂")
+	fmt.Println(str)
+	fmt.Println("-------------------")
+	data := keqing.RsaDecrypt(str)
+	fmt.Println(data)
+}
+func TestDemo16(t *testing.T) {
+	keqing.RsaGenerateKey("D:\\img")
+}
+
+func TestDemo15(t *testing.T) {
+	publicKey := `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuOP6JK8tT0WdIvMbK60T
+x/BrbuZN/tJn+HVXwh9xdDAyygMhpI7yfX1NFzkAtoBb9dCEbmvAtImSlq+grDMQ
+8qse/KI0W0viQLbIXwUdIaSx/qKYjUprYgBwlMN8woV99IB+SwZ7T5SHMb1LK6xM
+9ybaeiNxOPoeGy4S6YvEpC1tjtKKq8kpBlaN3psx5H2jeR//Jj/h4V/7trzWO5Em
+LgcC9jx4OazrAR85jOKgLo9L0KmKe6S4icQ8It7LN17BciqUKMrYQS0kj6R+HtoI
+3f79wNBLdTna3DYsF3YDLBrlPV8GB0PSTUTqNSoX42/qlZVuH8wz8TGpQijsRc/v
+3wIDAQAB
+-----END PUBLIC KEY-----`
+	privateKey := `-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC44/okry1PRZ0i
+8xsrrRPH8Gtu5k3+0mf4dVfCH3F0MDLKAyGkjvJ9fU0XOQC2gFv10IRua8C0iZKW
+r6CsMxDyqx78ojRbS+JAtshfBR0hpLH+opiNSmtiAHCUw3zChX30gH5LBntPlIcx
+vUsrrEz3Jtp6I3E4+h4bLhLpi8SkLW2O0oqrySkGVo3emzHkfaN5H/8mP+HhX/u2
+vNY7kSYuBwL2PHg5rOsBHzmM4qAuj0vQqYp7pLiJxDwi3ss3XsFyKpQoythBLSSP
+pH4e2gjd/v3A0Et1OdrcNiwXdgMsGuU9XwYHQ9JNROo1Khfjb+qVlW4fzDPxMalC
+KOxFz+/fAgMBAAECggEAHYDzt8rkdhPrwVn96fhSgcNRwX6qz5EP2kwPVwDhf+L5
+F9dsFPBirbfDB4OnI3hUNGOz3lL/i0+wvq8D+raja7X22eWgaTkwv5brXo5YWbgI
+V1Pm+BT6Ecd0L6kKTZgzw0KF5L8CCm7vK/bC+hMirQXcM0VYmfj/uOKfTflpxbDc
+OPtzT99lVhjJg2e7GTnwpIXERI8SByjc+L1pQrN4FsoOl4VTg8o+QeLcKHghFaZ1
+jnQb9B2EQ1TrsGnww1tNrNOvV9k/UBXCH+A3s6OCaHfNLoREATMqrtX11a2qzMZz
+7VZtWC7uqI/FjZZEDluXYlJHqe9VY4c7cVqMIuNSMQKBgQDz72qDrdufi5z61h89
+vWg0giIC6gkyy6OhwDYbv4ydI/9m3vexGbkX33YLmSxxKmgiYT6UD+LvjiHw6Waa
+0iFX7L0FF1KgPRxhfs1g37YPWD1e/2tpT17VKLqjMAX4xOwZ3HfVvZBI/0g6hjzZ
+sBB3Vtq0iyU+yXFZ5u2pgtqp7QKBgQDCCPec900fNF6e08Z0fxWVYqPiOw4I3iWb
+emi3pGPWMLPoOwKDPfguSaHJKhi/Gq9Ipd30T2xkvuW7jMFzMOcGhoVMmFVuLfJz
+ttj8J5x1YtgmNrXYwtWXQJypqmZJTYwXOBzUYRiplIZNvA1FIy0tSVyH1Zg85/43
+vpElJ+wXewKBgHAOuaWIBm4CWri4CF36VpZYeXtRO6yD88VoYPLaSaQeV0NQhgRr
+RqX612V4lfveeTvh5DdsHNnjNyBOd/4DLaIQdLyT/Db0G8eF0p7/5ciixn6PYy5b
+cbsGHMa+Vt/yxmsS5lHf5RpDe1C3PdjakpXf5lQt34w6ScH83YyTOhP5AoGBAK5C
+s28LQv4lYF0wQOlbQR0aq6h/9QjNyeSquOVFBEzXDJwicw0/WGbpxh0Oa48l/go2
+vPGvat/H+jbIIOy9HJ7lrU2u+fqr1TVLH/DF+mQKU6luNT7pLD5cztYprRdkR86K
+nIm4chfKxhuGKjzPbMFhQ3LSx5jbmZqi0WQXSJeFAoGARorE8VlMqDbgtSP/TApp
+HAr/UuVdmf8Ag+ZUpa2o33E39L9yLnj7L60GZKVJ87weYj/CHatiCIzpStNsGkoU
+81iOD/cUhLl7K9B0WeT7ECfO4Vk6xg6n0SH6YykEyudAmlrtVfxZ1EclQ2OKhxfN
+Ia8OCVyYe7VFKVYFkh4PBhQ=
+-----END PRIVATE KEY-----`
+	str := keqing.RsaEncryptCustom(publicKey, "剑光如我,斩尽牛杂")
+	fmt.Println(str)
+	fmt.Println("-------------------")
+	data := keqing.RsaDecryptCustom(privateKey, str)
+	fmt.Println(data)
+}
 
 func demo14() {
 	intSlice1 := []int{12, 85, 96, 45, 62, 9, 27, 31, 55, 77}

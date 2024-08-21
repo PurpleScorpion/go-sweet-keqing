@@ -85,7 +85,32 @@
 
 ### RSA工具类
   ```text
-    // TODO 待开发
+    RsaGenerateKey(path) // 生成RSA密钥对 , path为密钥对保存路径
+    RsaLoadKey(publicKey string, privateKey string, keyType string) // 加载RSA密钥对
+    RsaLoadPrivateKey(privateKey string) *rsa.PrivateKey // 加载RSA私钥
+    RsaLoadPublicKey(publicKey string) *rsa.PublicKey // 加载RSA公钥
+    RsaEncrypt(data string) string // RSA加密 - 前置条件需使用RsaLoadKey加载密钥对
+    RsaEncryptCustom(publicKey string, data string) string // RSA加密 - 自定义密钥字符串加密
+    RsaEncrypt4RsaKey(publicKey *rsa.PublicKey, data string) string // RSA加密 - 自定义公钥对象加密
+    RsaDecrypt(data string) string // RSA解密 - 前置条件需使用RsaLoadKey加载密钥对
+    RsaDecryptCustom(privateKey string, data string) string // RSA解密 - 自定义密钥字符串解密
+    RsaDecrypt4RsaKey(privateKey *rsa.PrivateKey, data string) string // RSA解密 - 自定义私钥对象解密
+  ```
+
+### File工具类
+  ```text
+   MkdirAll(path) // 创建文件夹
+   FileExists(path) bool // 判断文件是否存在
+   ReadDirFiles(path) ([]string, error) // 获取文件夹下的所有文件
+   FileMD5(path) (string, error) // 获取文件的MD5值
+   SaveFile(path,content) error // 将字符串保存到文件
+   CopyFile(src,dest string) error // 复制文件 - 使用字符串路径
+   CopyFile2IO(dst io.Writer, src io.Reader) error // 复制文件 - 使用io.Reader和io.Writer
+   RemoveFile(path) error // 删除文件
+   RemoveDir(path) error // 删除文件夹
+   ReNameFile(oldPath,newPath) error // 重命名文件
+   FileSize(path) (int64, error) // 获取文件大小
+   HomePath() string // 获取当前用户的主目录
   ```
 
 ### 软妹币工具类
