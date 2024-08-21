@@ -113,6 +113,54 @@
    HomePath() string // 获取当前用户的主目录
   ```
 
+### Yml工具类
+  ```text
+   yml数据获取工具, 旨在模拟@Value注解的功能
+   重要前提: 
+   请先用 gopkg.in/yaml.v3 v3.0.1 版本的包对yml文件进行解析成 map[string]interface{} 
+   一共需要解析application.yml文件 与 application-激活的环境.yml文件
+   问: 为什么不直接将这个包导入进来?
+   答: 该工具类目的是纯净化封装, 不想因为导入了其他第三方的包从而导致在其他项目中产生不兼容的情况
+   
+   gopkg.in/yaml.v3的使用方法:
+   data, err := os.ReadFile(confPath)
+   if err != nil {
+      panic("Error reading configuration file: " + err.Error())
+   }
+   var conf1 = make(map[string]interface{})
+   yaml.Unmarshal(data, &conf1)
+   
+   data2, err2 := os.ReadFile(confPath2)
+   if err2 != nil {
+      panic("Error reading configuration file: " + err2.Error())
+   }
+   var conf2 = make(map[string]interface{})
+   yaml.Unmarshal(data2, &conf2)
+   
+   然后使用本工具类中的-LoadYml(parent map[string]interface{}, child map[string]interface{}) error 函数进行加载
+   
+   方法介绍: 
+   ValueInt(str) int // 获取yml中int类型的值
+   ValueInt64(str) int64 // 获取yml中int64类型的值
+   ValueInt32(str) int32 // 获取yml中int32类型的值
+   ValueFloat64(str) float64 // 获取yml中float64类型的值
+   ValueFloat32(str) float32 // 获取yml中float32类型的值
+   ValueBool(str) bool // 获取yml中bool类型的值
+   ValueString(str) string // 获取yml中string类型的值
+   ValueStringArr(str) []string // 获取yml中字符串数组类型的值
+   
+   使用示例:
+   注意: 参数的格式应当与@Value注解一致 , 当找不到指定key时, 会返回go中对应类型的默认值
+   1. 获取int类型的值
+   val1 := ValueInt("${com.example.config.value}")
+   2. 获取string类型的值
+   val2 := ValueString("${com.example.config.value}")
+   3. 获取字符串数组类型的值
+   val3 := ValueStringArr("${com.example.config.value}")
+   4. 获取bool类型的值
+   val4 := ValueBool("${com.example.config.value}")
+  ```
+
 ### 软妹币工具类
   ```text
     Yuan2Fen(string) int64 // 元转分
