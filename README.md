@@ -4,6 +4,7 @@
 ## 剑光如我，斩尽牛杂！
 ### 基础支持
  - go 1.20及以上环境
+ - github地址: https://github.com/PurpleScorpion/go-sweet-keqing
 ### 使用方式
 
  - 1 引入包 
