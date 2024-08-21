@@ -11,7 +11,7 @@ func IsEmpty(obj interface{}) bool {
 
 	switch v := obj.(type) {
 	case string:
-		return len(v) == 0
+		return len(v) == 0 || ToUpperCase(v) == "NULL"
 	case int:
 		return v == 0
 	case int8:
