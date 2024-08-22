@@ -149,6 +149,7 @@
    ValueBool(str) bool // 获取yml中bool类型的值
    ValueString(str) string // 获取yml中string类型的值
    ValueStringArr(str) []string // 获取yml中字符串数组类型的值
+   ValueObject(obj) interface{} // 获取yml中object类型的值 , 但是不建议使用 , 除非你想打印数据看看
    
    使用示例:
    注意: 参数的格式应当与@Value注解一致 , 当找不到指定key时, 会返回go中对应类型的默认值
@@ -160,6 +161,20 @@
    val3 := ValueStringArr("${com.example.config.value}")
    4. 获取bool类型的值
    val4 := ValueBool("${com.example.config.value}")
+   
+   注意: gopkg.in/yaml.v3 中的一些坑
+   当时使用map接受yml数据的时候
+   偶尔我们的密码是123456这种纯数字类型的 , 他这个转换会给转成数字 , 导致我们无法获取到正确的值
+   这是需要手动转成string类型
+   例如:
+    pwd := keqing.ValueObject("${sweet.mysql.password}")
+	password := ""
+	switch pwd.(type) {
+	case int:
+		password = fmt.Sprintf("%d", pwd.(int))
+	case string:
+		password = pwd.(string)
+	}
   ```
 
 ### 软妹币工具类
