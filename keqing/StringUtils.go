@@ -94,7 +94,6 @@ func map2Str(obj interface{}) string {
 		} else if isSlice(value) {
 			result = append(result, fmt.Sprintf("%s: %v", key, array2Str(value)))
 		} else {
-			fmt.Println("aaaaaaaaaaaaaaaa", key)
 			result = append(result, fmt.Sprintf("%s: %v", key, value))
 		}
 	}
