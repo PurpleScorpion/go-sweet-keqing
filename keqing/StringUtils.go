@@ -75,8 +75,30 @@ func ToString(obj interface{}) string {
 	if isStruct(obj) {
 		return struct2Str(obj)
 	}
+	// 如果是map 类型
+	if isMap(obj) {
+		return map2Str(obj)
+	}
 
 	return ""
+}
+
+func map2Str(obj interface{}) string {
+	mymap := obj.(map[string]interface{})
+	var result []string
+	for key, value := range mymap {
+		if isStruct(value) {
+			result = append(result, fmt.Sprintf("%s: %v", key, struct2Str(value)))
+		} else if isMap(value) {
+			result = append(result, fmt.Sprintf("%s: %v", key, map2Str(value)))
+		} else if isSlice(value) {
+			result = append(result, fmt.Sprintf("%s: %v", key, array2Str(value)))
+		} else {
+			fmt.Println("aaaaaaaaaaaaaaaa", key)
+			result = append(result, fmt.Sprintf("%s: %v", key, value))
+		}
+	}
+	return "{" + strings.Join(result, ", ") + "}"
 }
 
 func struct2Str(obj interface{}) string {
@@ -87,8 +109,13 @@ func struct2Str(obj interface{}) string {
 		field := t.Field(i)
 		value := v.Field(i)
 		if field.Type.Kind() == reflect.Struct {
-			result = append(result, struct2Str(value.Interface()))
+			result = append(result, fmt.Sprintf("%s: %v", field.Name, struct2Str(value.Interface())))
+		} else if isMap(value.Interface()) {
+			result = append(result, fmt.Sprintf("%s: %v", field.Name, map2Str(value.Interface())))
+		} else if isSlice(value.Interface()) {
+			result = append(result, fmt.Sprintf("%s: %v", field.Name, array2Str(value.Interface())))
 		} else {
+
 			result = append(result, fmt.Sprintf("%s: %v", field.Name, value))
 		}
 	}
@@ -115,7 +142,15 @@ func array2Str(obj interface{}) string {
 		case bool:
 			result = append(result, strconv.FormatBool(v))
 		default:
-			result = append(result, fmt.Sprintf("%v", v))
+			if isStruct(item) {
+				result = append(result, struct2Str(item))
+			} else if isMap(item) {
+				result = append(result, map2Str(item))
+			} else if isSlice(item) {
+				result = append(result, array2Str(item))
+			} else {
+				result = append(result, fmt.Sprintf("%v", v))
+			}
 		}
 	}
 

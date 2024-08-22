@@ -7,6 +7,51 @@ import (
 	"testing"
 )
 
+type animal struct {
+	Jinmao dog
+	Dogs   []dog
+}
+
+type dog struct {
+	Name string
+	Age  int
+}
+
+func TestDemo19(t *testing.T) {
+	var dongwu animal
+	dongwu.Jinmao.Name = "金毛"
+	dongwu.Jinmao.Age = 18
+	var dogs []dog
+	dogs = append(dogs, dog{Name: "二哈", Age: 5})
+	dogs = append(dogs, dog{Name: "边牧", Age: 6})
+	dogs = append(dogs, dog{Name: "泰迪", Age: 7})
+	dongwu.Dogs = dogs
+	fmt.Println(keqing.ToString(dongwu))
+}
+
+func TestDemo18(t *testing.T) {
+	mymap := make(map[string]interface{})
+	mymap["name"] = "keqing"
+	mymap["age"] = 13
+	mymap["hasGo"] = true
+	mymap["list"] = []string{"banana", "apple", "orange", "grape"}
+	mymap["dog"] = dog{
+		Name: "二哈",
+		Age:  5,
+	}
+	objList := make([]interface{}, 0)
+	objList = append(objList, "张三")
+	objList = append(objList, "李四")
+	objList = append(objList, 100)
+	objList = append(objList, true)
+	objList = append(objList, dog{Name: "狗子", Age: 6})
+	objList = append(objList, []string{"阿狸", "亚索", "提莫"})
+	mymap["objList"] = objList
+
+	fmt.Println(keqing.ToString(mymap))
+
+}
+
 func TestDemo17(t *testing.T) {
 	keqing.RsaLoadKey("D:\\img\\publicKey.pem", "D:\\img\\privateKey.pem", keqing.RSA_KEY_FILE_TYPE)
 	str := keqing.RsaEncrypt("剑光如我,斩尽牛杂")
