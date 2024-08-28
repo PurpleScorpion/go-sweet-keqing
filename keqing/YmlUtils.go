@@ -31,6 +31,24 @@ func ValueInt(key string) int {
 	if val == nil {
 		return 0
 	}
+
+	switch v := val.(type) {
+	case float64:
+		return int(v)
+	case float32:
+		return int(v)
+	case int:
+		return v
+	case int8:
+		return int(v)
+	case int16:
+		return int(v)
+	case int32:
+		return int(v)
+	case int64:
+		return int(v)
+	}
+
 	return val.(int)
 }
 
@@ -51,6 +69,22 @@ func ValueFloat64(key string) float64 {
 	if val == nil {
 		return 0
 	}
+	switch v := val.(type) {
+	case float64:
+		return v
+	case float32:
+		return float64(v)
+	case int:
+		return float64(v)
+	case int8:
+		return float64(v)
+	case int16:
+		return float64(v)
+	case int32:
+		return float64(v)
+	case int64:
+		return float64(v)
+	}
 	return val.(float64)
 }
 
@@ -66,6 +100,22 @@ func ValueString(key string) string {
 	val := getYamlValue(key)
 	if val == nil {
 		return ""
+	}
+	switch v := val.(type) {
+	case float64:
+		return Num2Str(v)
+	case float32:
+		return Num2Str(v)
+	case int:
+		return Num2Str(v)
+	case int8:
+		return Num2Str(v)
+	case int16:
+		return Num2Str(v)
+	case int32:
+		return Num2Str(v)
+	case int64:
+		return Num2Str(v)
 	}
 	return val.(string)
 }
