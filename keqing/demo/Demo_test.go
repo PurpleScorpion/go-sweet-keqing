@@ -17,6 +17,19 @@ type dog struct {
 	Age  int
 }
 
+func TestDemo20(t *testing.T) {
+	var str1 = "2024-08-30 10:48:01"
+	var str2 = "2024-07-19T21:30:04.175576Z"
+	fmt.Println("Local => Local", keqing.ParseLocal(str1))
+	fmt.Println("Local => UTC", keqing.Local2UTC(str1))
+	fmt.Println("UTC => UTC", keqing.ParseUTC(str2))
+	fmt.Println("UTC => Local", keqing.UTC2Local(str2))
+
+	fmt.Println("Parse -------------------------------- ")
+	fmt.Println("Local ", keqing.ParseDate(str1, keqing.DEFAULT_LOCAL_FORMAT, keqing.LOCAL))
+	fmt.Println("UTC ", keqing.ParseDate(str2, keqing.DEFAULT_UTC_FORMAT, keqing.UTC))
+}
+
 func TestDemo19(t *testing.T) {
 	var dongwu animal
 	dongwu.Jinmao.Name = "金毛"

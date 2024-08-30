@@ -11,6 +11,8 @@ var (
 	LOCAL_FORMAT_TIME    = "15:04:05"
 	DEFAULT_UTC_FORMAT   = "2006-01-02T15:04:05.999999Z"
 	UTC_FORMAT_SHORT     = "2006-01-02T15:04:05Z"
+	UTC                  = time.UTC
+	LOCAL                = time.Local
 )
 
 type TimeVO struct {
@@ -85,10 +87,13 @@ func FormatDate(date time.Time, format string) string {
 	return date.Format(format)
 }
 
-func ParseDate(dateStr string, format string) time.Time {
-	date, err := time.Parse(format, dateStr)
+func ParseDate(dateStr string, format string, location *time.Location) time.Time {
+	if location == nil {
+		location = time.UTC
+	}
+	date, err := time.ParseInLocation(format, dateStr, location)
 	if err != nil {
-		panic("utc time parse error")
+		panic("time parse error")
 	}
 	return date
 }
@@ -125,33 +130,33 @@ func DateSubDay(date time.Time, day int64) time.Time {
 }
 
 func ParseUTC(utc string) time.Time {
-	return ParseDate(utc, DEFAULT_UTC_FORMAT)
+	return ParseDate(utc, DEFAULT_UTC_FORMAT, UTC)
 }
 
 func ParseLocal(local string) time.Time {
-	return ParseDate(local, DEFAULT_LOCAL_FORMAT)
+	return ParseDate(local, DEFAULT_LOCAL_FORMAT, LOCAL)
 }
 
 func UTC2Local(utc string) string {
-	date := ParseDate(utc, DEFAULT_UTC_FORMAT)
+	date := ParseDate(utc, DEFAULT_UTC_FORMAT, UTC)
 	local := date.Local()
 	return FormatDate(local, DEFAULT_LOCAL_FORMAT)
 }
 
 func UTC2LocalCustom(utc string, utcFormat string, localFormat string) string {
-	date := ParseDate(utc, utcFormat)
+	date := ParseDate(utc, utcFormat, UTC)
 	local := date.Local()
 	return FormatDate(local, localFormat)
 }
 
 func Local2UTC(local string) string {
-	date := ParseDate(local, DEFAULT_LOCAL_FORMAT)
+	date := ParseDate(local, DEFAULT_LOCAL_FORMAT, LOCAL)
 	utc := date.UTC()
 	return FormatDate(utc, DEFAULT_UTC_FORMAT)
 }
 
 func Local2UTCCustom(local string, localFormat string, utcFormat string) string {
-	date := ParseDate(local, localFormat)
+	date := ParseDate(local, localFormat, LOCAL)
 	utc := date.UTC()
 	return FormatDate(utc, utcFormat)
 }
