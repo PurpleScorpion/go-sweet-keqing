@@ -17,6 +17,23 @@ type dog struct {
 	Age  int
 }
 
+func TestDemo21(t *testing.T) {
+	var publicKeyStrEv = `-----BEGIN PUBLIC KEY-----
+公钥
+-----END PUBLIC KEY-----`
+
+	var privateKeyStrEv = `-----BEGIN RSA PRIVATE KEY-----
+私钥
+-----END RSA PRIVATE KEY-----`
+	rsaLoadPublicKey := keqing.RsaLoadPublicKey(publicKeyStrEv)
+	rsaLoadPrivateKey := keqing.RsaLoadPrivateKey(privateKeyStrEv)
+
+	token := keqing.RsaEncrypt4PKCS1(rsaLoadPublicKey, "hahah")
+	fmt.Println(token)
+	data := keqing.RsaDecrypt4PKCS1(rsaLoadPrivateKey, token)
+	fmt.Println(data)
+}
+
 func TestDemo20(t *testing.T) {
 	var str1 = "2024-08-30 10:48:01"
 	var str2 = "2024-07-19T21:30:04.175576Z"

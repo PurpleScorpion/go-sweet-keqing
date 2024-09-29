@@ -96,6 +96,15 @@
     RsaDecrypt(data string) string // RSA解密 - 前置条件需使用RsaLoadKey加载密钥对
     RsaDecryptCustom(privateKey string, data string) string // RSA解密 - 自定义密钥字符串解密
     RsaDecrypt4RsaKey(privateKey *rsa.PrivateKey, data string) string // RSA解密 - 自定义私钥对象解密
+    
+    // PKCS1 的使用方式 , 这属于Java常用的加密方式 , 在与Java系统对接时可以使用
+    * <li>{@code RSA/ECB/PKCS1Padding} (1024, 2048)</li>
+    * <li>{@code RSA/ECB/OAEPWithSHA-1AndMGF1Padding} (1024, 2048)</li>
+    * <li>{@code RSA/ECB/OAEPWithSHA-256AndMGF1Padding} (1024, 2048)</li>
+    
+    RsaEncrypt4PKCS1(publicKey *rsa.PublicKey, data string) string // RSA加密 - PKCS1加密
+    RsaDecrypt4PKCS1(key *rsa.PrivateKey, ciphertextString string) string // RSA解密 - PKCS1解密
+    
   ```
 
 ### File工具类

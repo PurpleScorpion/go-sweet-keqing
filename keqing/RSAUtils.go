@@ -18,6 +18,8 @@ var (
 	privateKeyBlock     *rsa.PrivateKey = nil
 	RSA_KEY_FILE_TYPE                   = "FILE"
 	RSA_KEY_STRING_TYPE                 = "STRING"
+	RSA_PKCS1                           = "PKCS1"
+	RSA_PKCS8_SHA_256                   = "sha256"
 )
 
 /*
@@ -139,6 +141,25 @@ func RsaLoadPublicKey(publicKeyPEM string) *rsa.PublicKey {
 	}
 }
 
+// 使用PKCS1 进行加密, 这个通常与Java中的默认配置一致
+func RsaEncrypt4PKCS1(publicKey *rsa.PublicKey, data string) string {
+	if publicKey == nil {
+		panic("请先加载公钥")
+	}
+	if IsEmpty(data) {
+		panic("The data to be encrypted cannot be empty")
+	}
+	plaintext := []byte(data)
+
+	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, publicKey, plaintext)
+	if err != nil {
+		fmt.Println(err.Error())
+		return ""
+	}
+	encodedCiphertext := base64.StdEncoding.EncodeToString(ciphertext)
+	return encodedCiphertext
+}
+
 /*
 加密文本
 */
@@ -192,6 +213,26 @@ func RsaEncrypt4RsaKey(publicKey *rsa.PublicKey, data string) string {
 		return ""
 	}
 	return base64.StdEncoding.EncodeToString(ciphertext)
+}
+
+func RsaDecrypt4PKCS1(key *rsa.PrivateKey, ciphertextString string) string {
+	if key == nil {
+		panic("Please load the private key first")
+	}
+	if IsEmpty(ciphertextString) {
+		panic("The ciphertext cannot be empty")
+	}
+	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextString)
+	if err != nil {
+		log.Println("Password parsing failed:", err)
+		return ""
+	}
+	plaintext, err := rsa.DecryptPKCS1v15(rand.Reader, key, ciphertext)
+	if err != nil {
+		fmt.Println("Decryption failed:", err)
+		return ""
+	}
+	return string(plaintext)
 }
 
 /*
