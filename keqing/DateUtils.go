@@ -181,3 +181,73 @@ func CurrentTimeSeconds() int64 {
 	// 获取当前时间的纳秒级时间戳
 	return NowDate().Unix()
 }
+
+/*
+获取昨天的开始和结束时间
+*/
+func GetStartAndEnd4Yesterday() (time.Time, time.Time) {
+	now := time.Now()
+	// 减去24小时得到昨天同一时间
+	yesterdaySameTime := now.Add(-24 * time.Hour)
+	// 设置时间为昨天0点
+	yesterdayStart := time.Date(yesterdaySameTime.Year(), yesterdaySameTime.Month(), yesterdaySameTime.Day(), 0, 0, 0, 0, time.Local)
+	// 计算昨天24点的时间
+	yesterdayEnd := yesterdayStart.Add(24 * time.Hour)
+	return yesterdayStart, yesterdayEnd
+}
+
+/*
+获取昨天的开始和结束时间-UTC
+*/
+func GetStartAndEndUTC4Yesterday() (time.Time, time.Time) {
+	yesterdayStart, yesterdayEnd := GetStartAndEnd4Yesterday()
+	return yesterdayStart.UTC(), yesterdayEnd.UTC()
+}
+
+/*
+获取今天的开始和结束时间
+*/
+func GetStartAndEnd4Today() (time.Time, time.Time) {
+	now := time.Now()
+	// 设置时间为昨天0点
+	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	// 获取明天的开始时间
+	nextDay := start.AddDate(0, 0, 1)
+	// 获取今天的结束时间
+	end := nextDay.Add(-time.Nanosecond)
+	return start, end
+}
+
+/*
+获取今天的开始和结束时间-UTC
+*/
+func GetStartAndEndUTC4Today() (time.Time, time.Time) {
+	start, now := GetStartAndEnd4Today()
+	return start.UTC(), now.UTC()
+}
+
+/*
+获取本月的开始和结束时间
+*/
+func GetStartAndEnd4CurrentMonth() (time.Time, time.Time) {
+	// 获取当前时间
+	now := time.Now()
+
+	// 获取本月的开始时间
+	firstDayOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
+
+	// 获取下个月的开始时间
+	firstDayOfNextMonth := firstDayOfMonth.AddDate(0, 1, 0)
+
+	// 获取本月的结束时间
+	lastDayOfMonth := firstDayOfNextMonth.Add(-time.Nanosecond)
+	return firstDayOfMonth, lastDayOfMonth
+}
+
+/*
+获取本月的开始和结束时间-UTC
+*/
+func GetStartAndEndUTC4CurrentMonth() (time.Time, time.Time) {
+	start, now := GetStartAndEnd4CurrentMonth()
+	return start.UTC(), now.UTC()
+}
