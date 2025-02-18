@@ -175,10 +175,10 @@ func CurrentTimeMillis() int64 {
 }
 
 /*
-获取当前系统的毫秒级时间戳
+获取当前系统的秒级时间戳
 */
 func CurrentTimeSeconds() int64 {
-	// 获取当前时间的纳秒级时间戳
+	// 获取当前时间的秒级时间戳
 	return NowDate().Unix()
 }
 

@@ -17,6 +17,149 @@ type dog struct {
 	Age  int
 }
 
+func TestDemo26(t *testing.T) {
+	str := "elec_gen_coef_gj_kWh\telec_gen_co2_coef\telec_day_coef\telec_day_co2_coef\telec_night_coef\telec_night_co2_coef\telec2_gen_coef\telec2_gen_co2_coef\telec2_day_coef\telec2_day_co2_coef\telec2_night_coef\telec2_night_co2_coef\tcity_gas_coef\tcity_gas_co2_coef\tlp_gas_coef\tlp_gas_co2_coef\toil_a_heavy_coef\toil_a_heavy_co2_coef\toil_light_coef\toil_light_co2_coef\toil_kero_coef\toil_kero_co2_coef\tdistrict_energy_coef\tdistrict_energy_co2_coef\tother1_energy_coef\tother1_co2_coef\tother2_energy_coef\tother2_co2_coef\tsolar_self_consumption_coef\tsolar_self_consumption_co2\tsolar_sell_coef\tsolar_sell_co2\tsolar_total_gen_coef\tsolar_total_gen_co2\tcogeneration_elec_coef\tcogeneration_elec_co2\trenewable_self_consumption_coef\trenewable_self_consumption_co2\trenewable_sell_coef\trenewable_sell_co2\tdistrict_heating_coef\tdistrict_heating_co2\tother1_energy_coef_kWh\tother1_co2_coef_kWh\tother2_energy_coef_kWh\tother2_co2_coef_kWh"
+	arr := keqing.Split(str, "\t")
+
+	for i := 0; i < len(arr); i++ {
+		char := toExcelChar(i+6) + "21"
+		fmt.Println(char + "\t\t" + keqing.Snake2BigCamel(arr[i]) + "\t\t\t\t" + "get" + keqing.Snake2BigCamel(arr[i]))
+	}
+
+}
+
+func TestDemo25(t *testing.T) {
+	str := "other_elec_gen_gj\tother_elec_day_gj\tother_elec_night_gj\tother_city_gas_gj\tother_lp_gas_gj"
+	arr := keqing.Split(str, "\t")
+
+	for i := 0; i < len(arr); i++ {
+		char := toExcelChar(i+6) + "21"
+		fmt.Println(arr[i] + "\t\t\t\t" + char + "\t\t\t\t" + keqing.Snake2BigCamel(arr[i]) + "\t\t\t\t" + "get" + keqing.Snake2BigCamel(arr[i]))
+	}
+
+}
+
+func toExcelChar(n int) string {
+	var s string
+	for n > 0 {
+		n--
+		s = string(rune('A'+n%26)) + s
+		n /= 26
+	}
+	return s
+}
+
+func TestDemo24(t *testing.T) {
+	str := "heat_elec_gen_gj\theat_elec_day_gj\theat_elec_night_gj\theat_city_gas_gj\theat_lp_gas_gj\theat_a_heavy_oil_gj\theat_light_oil_gj\theat_kero_gj\theat_hvac_gj\theat_other1_gj\tac_elec_gen_gj\tac_elec_day_gj\tac_elec_night_gj\tpump_elec_gen_gj\tpump_elec_day_gj\tpump_elec_night_gj\tac_std_energy_gj\tac_elec_total\tac_reduction_gj\tac_reduction_rate\tac_bei\tcogeneration_city_gas_gj\tcogeneration_lp_gas_gj\tcogeneration_a_heavy_oil_gj\tcogeneration_light_oil_gj\tcogeneration_kero_gj\tvent_elec_gen_gj\tvent_elec_day_gj\tvent_elec_night_gj\tvent_std_energy_gj\tvent_elec_total\tvent_reduction_gj\tvent_reduction_rate\tvent_bei\tlight_elec_gen_gj\tlight_elec_day_gj\tlight_elec_night_gj\tlight_std_energy_gj\tlight_elec_total\tlight_reduction_gj\tlight_reduction_rate\tlight_bei\thotwater_elec_gen_gj\thotwater_elec_day_gj\thotwater_elec_night_gj\thotwater_city_gas_gj\thotwater_lp_gas_gj\thotwater_a_heavy_oil_gj\thotwater_light_oil_gj\thotwater_kero_gj\thotwater_other2_gj\thotwater_std_energy_gj\thotwater_elec_total\thotwater_reduction_gj\thotwater_reduction_rate\thotwater_bei\televator_elec_gen_gj\televator_elec_day_gj\televator_elec_night_gj\televator_std_energy_gj\televator_elec_total\televator_reduction_gj\televator_reduction_rate\televator_bei\tother_elec_gen_gj\tother_elec_day_gj\tother_elec_night_gj\tother_city_gas_gj\tother_lp_gas_gj\tother_std_energy_gj\tother_elec_total\tother_reduction_gj\tsolar_self_consumption1_gj\tcogeneration_elec_gen3_gj\trenewable_self_consumption1_gj\trenewable_total_generation_gj\tcogeneration_std_energy_gj\tcogeneration_reduction_gj\tcogeneration_reduction_rate\tstd_energy_gj\telec_total\treduction_gj\treduction_rate\tbei\tmonth_reduction_rate"
+	arr := keqing.Split(str, "\t")
+
+	for i := 0; i < len(arr); i++ {
+		s := keqing.ToLowerCase(arr[i])
+		fmt.Println(s + ",")
+	}
+
+}
+
+func TestDemo22(t *testing.T) {
+	var str = `heat_elec_gen_gj,
+heat_elec_day_gj,
+heat_elec_night_gj,
+heat_city_gas_gj,
+heat_lp_gas_gj,
+heat_a_heavy_oil_gj,
+heat_light_oil_gj,
+heat_kero_gj,
+heat_hvac_gj,
+heat_other1_gj,
+ac_elec_gen_gj,
+ac_elec_day_gj,
+ac_elec_night_gj,
+pump_elec_gen_gj,
+pump_elec_day_gj,
+pump_elec_night_gj,
+ac_std_energy_gj,
+ac_elec_total,
+ac_reduction_gj,
+ac_reduction_rate,
+ac_bei,
+cogeneration_city_gas_gj,
+cogeneration_lp_gas_gj,
+cogeneration_a_heavy_oil_gj,
+cogeneration_light_oil_gj,
+cogeneration_kero_gj,
+vent_elec_gen_gj,
+vent_elec_day_gj,
+vent_elec_night_gj,
+vent_std_energy_gj,
+vent_elec_total,
+vent_reduction_gj,
+vent_reduction_rate,
+vent_bei,
+light_elec_gen_gj,
+light_elec_day_gj,
+light_elec_night_gj,
+light_std_energy_gj,
+light_elec_total,
+light_reduction_gj,
+light_reduction_rate,
+light_bei,
+hotwater_elec_gen_gj,
+hotwater_elec_day_gj,
+hotwater_elec_night_gj,
+hotwater_city_gas_gj,
+hotwater_lp_gas_gj,
+hotwater_a_heavy_oil_gj,
+hotwater_light_oil_gj,
+hotwater_kero_gj,
+hotwater_other2_gj,
+hotwater_std_energy_gj,
+hotwater_elec_total,
+hotwater_reduction_gj,
+hotwater_reduction_rate,
+hotwater_bei,
+elevator_elec_gen_gj,
+elevator_elec_day_gj,
+elevator_elec_night_gj,
+elevator_std_energy_gj,
+elevator_elec_total,
+elevator_reduction_gj,
+elevator_reduction_rate,
+elevator_bei,
+other_elec_gen_gj,
+other_elec_day_gj,
+other_elec_night_gj,
+other_city_gas_gj,
+other_lp_gas_gj,
+other_std_energy_gj,
+other_elec_total,
+other_reduction_gj,
+solar_self_consumption1_gj,
+cogeneration_elec_gen3_gj,
+renewable_self_consumption1_gj,
+renewable_total_generation_gj,
+cogeneration_std_energy_gj,
+cogeneration_reduction_gj,
+cogeneration_reduction_rate,
+std_energy_gj,
+elec_total,
+reduction_gj,
+reduction_rate,
+bei,
+month_reduction_rate`
+	arr := keqing.Split(str, ",")
+	for i := 0; i < len(arr); i++ {
+		fmt.Println(fmt.Sprintf("pojo.%s,", keqing.Trim(keqing.Snake2BigCamel(arr[i]))))
+	}
+	fmt.Println("============================")
+	for i := 0; i < len(arr); i++ {
+		fmt.Print("?, ")
+	}
+	fmt.Println("============================")
+	for i := 0; i < len(arr); i++ {
+		fmt.Println(fmt.Sprintf("%s = ?,", keqing.Trim(arr[i])))
+	}
+}
+
 func TestDemo21(t *testing.T) {
 	var publicKeyStrEv = `-----BEGIN PUBLIC KEY-----
 公钥
