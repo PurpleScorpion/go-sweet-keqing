@@ -17,6 +17,13 @@ type dog struct {
 	Age  int
 }
 
+func TestDemo27(t *testing.T) {
+
+	days := keqing.GetDaysInMonth(2025, 2)
+	fmt.Println(days)
+
+}
+
 func TestDemo26(t *testing.T) {
 	str := "elec_gen_coef_gj_kWh\telec_gen_co2_coef\telec_day_coef\telec_day_co2_coef\telec_night_coef\telec_night_co2_coef\telec2_gen_coef\telec2_gen_co2_coef\telec2_day_coef\telec2_day_co2_coef\telec2_night_coef\telec2_night_co2_coef\tcity_gas_coef\tcity_gas_co2_coef\tlp_gas_coef\tlp_gas_co2_coef\toil_a_heavy_coef\toil_a_heavy_co2_coef\toil_light_coef\toil_light_co2_coef\toil_kero_coef\toil_kero_co2_coef\tdistrict_energy_coef\tdistrict_energy_co2_coef\tother1_energy_coef\tother1_co2_coef\tother2_energy_coef\tother2_co2_coef\tsolar_self_consumption_coef\tsolar_self_consumption_co2\tsolar_sell_coef\tsolar_sell_co2\tsolar_total_gen_coef\tsolar_total_gen_co2\tcogeneration_elec_coef\tcogeneration_elec_co2\trenewable_self_consumption_coef\trenewable_self_consumption_co2\trenewable_sell_coef\trenewable_sell_co2\tdistrict_heating_coef\tdistrict_heating_co2\tother1_energy_coef_kWh\tother1_co2_coef_kWh\tother2_energy_coef_kWh\tother2_co2_coef_kWh"
 	arr := keqing.Split(str, "\t")

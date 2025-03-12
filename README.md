@@ -58,6 +58,8 @@
     
     CurrentTimeMillis() int64 // 获取当前时间戳(毫秒)
     CurrentTimeSeconds() int64 // 获取当前时间戳(秒)
+    
+    GetDaysInMonth(year, month int) int // 获取指定月份有多少天
   ```
 
 ### 空值判断工具类

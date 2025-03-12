@@ -143,6 +143,16 @@ func UTC2Local(utc string) string {
 	return FormatDate(local, DEFAULT_LOCAL_FORMAT)
 }
 
+// 获取当前月份的天数
+func GetDaysInMonth(year, month int) int {
+	// 获取下个月的第一天
+	firstDayOfNextMonth := time.Date(year, time.Month(month+1), 1, 0, 0, 0, 0, time.Local)
+	// 获取当前月的最后一天
+	lastDayOfMonth := firstDayOfNextMonth.AddDate(0, 0, -1)
+	// 获取最后一天的日期，即该月的天数
+	return lastDayOfMonth.Day()
+}
+
 func UTC2LocalCustom(utc string, utcFormat string, localFormat string) string {
 	date := ParseDate(utc, utcFormat, UTC)
 	local := date.Local()
