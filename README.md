@@ -59,7 +59,10 @@
     CurrentTimeMillis() int64 // 获取当前时间戳(毫秒)
     CurrentTimeSeconds() int64 // 获取当前时间戳(秒)
     
-    GetDaysInMonth(year int, month any) int // 获取指定月份有多少天 , 其中month可以是 int或者time.Month类型
+    // 获取指定月份有多少天 , 其中month可以是 int(包含int/int16/int32/int64,以下简称为int)或者time.Month或time.Time类型
+    // 当month是time.Month或int类型时, year参数必填
+    // 当month是time.Time类型时, year参数可以不填, 如果填了year参数, 则会根据填写的year参数和month计算出当月的天数
+    GetDaysInMonth(month any,year... int) int 
   ```
 
 ### 空值判断工具类
