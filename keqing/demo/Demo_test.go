@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/PurpleScorpion/go-sweet-keqing/keqing"
 	"testing"
+	"time"
 )
 
 type animal struct {
@@ -19,7 +20,10 @@ type dog struct {
 
 func TestDemo27(t *testing.T) {
 
-	days := keqing.GetDaysInMonth(2025, 2)
+	//days := keqing.GetDaysInMonth(2025, 2)
+	//days := keqing.GetDaysInMonth(time.Now())
+	now := time.Date(2025, 2, 1, 0, 0, 0, 0, time.Local)
+	days := keqing.GetDaysInMonth(now)
 	fmt.Println(days)
 
 }

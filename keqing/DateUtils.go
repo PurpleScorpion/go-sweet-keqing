@@ -144,13 +144,49 @@ func UTC2Local(utc string) string {
 }
 
 // 获取当前月份的天数
-func GetDaysInMonth(year, month int) int {
+func GetDaysInMonth(data any, years ...int) int {
+	year, month, err := getMonthFromData(data)
+	if err != nil {
+		panic(err)
+	}
+	if year == 0 {
+		if years == nil || len(years) == 0 {
+			panic("please provide the year")
+		}
+		year = years[0]
+	}
+
 	// 获取下个月的第一天
-	firstDayOfNextMonth := time.Date(year, time.Month(month+1), 1, 0, 0, 0, 0, time.Local)
+	firstDayOfNextMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Local)
 	// 获取当前月的最后一天
 	lastDayOfMonth := firstDayOfNextMonth.AddDate(0, 0, -1)
 	// 获取最后一天的日期，即该月的天数
 	return lastDayOfMonth.Day()
+}
+func getMonthFromData(data any) (int, time.Month, error) {
+	var month int
+	switch t := data.(type) {
+	case int:
+		month = t
+	case int16:
+		month = int(t)
+	case int32:
+		month = int(t)
+	case int64:
+		month = int(t)
+	case time.Month:
+		return 0, t, nil
+	case time.Time:
+		return t.Year(), t.Month(), nil
+	default:
+		return 0, 0, fmt.Errorf("The value is of an unknown type: %T", t)
+	}
+
+	if month < 1 || month > 12 {
+		return 0, 0, fmt.Errorf("month must be between 1 and 12: %d", month)
+	}
+
+	return 0, time.Month(month), nil
 }
 
 func UTC2LocalCustom(utc string, utcFormat string, localFormat string) string {
