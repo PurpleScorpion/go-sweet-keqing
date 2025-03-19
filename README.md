@@ -237,4 +237,6 @@
     ParseFloat32(str) float32 // 将字符串解析成float32
     ParseFloat64(str) float64 // 将字符串解析成float64
     Split(str,sep) []string // 将字符串按照sep分割成字符串数组
+    StartWith(str,prefix) bool // 判断字符串是否以prefix开头
+    EndWith(str,suffix) bool // 判断字符串是否以suffix结尾
    ```

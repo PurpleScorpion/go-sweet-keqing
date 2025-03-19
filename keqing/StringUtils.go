@@ -10,6 +10,20 @@ import (
 )
 
 /*
+判断字符串是否以指定字符串开头
+*/
+func StartWith(str, prefix string) bool {
+	return strings.HasPrefix(str, prefix)
+}
+
+/*
+判断字符串是否以指定字符串结尾
+*/
+func EndWith(str, suffix string) bool {
+	return strings.HasSuffix(str, suffix)
+}
+
+/*
 字符串替换 - 正则替换
 mainStr: 主字符串
 pattern: 正则表达式

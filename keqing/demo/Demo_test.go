@@ -18,6 +18,12 @@ type dog struct {
 	Age  int
 }
 
+func TestDemo28(t *testing.T) {
+
+	str := "ems-dev"
+	flag := keqing.StartWith(str, "ems-1")
+	fmt.Println(flag)
+}
 func TestDemo27(t *testing.T) {
 
 	//days := keqing.GetDaysInMonth(2025, 2)
