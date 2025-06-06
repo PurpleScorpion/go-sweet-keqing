@@ -83,25 +83,32 @@ func SaveFile(path, data string) error {
 	return nil
 }
 
-/*
-保存文件, 使用字符串路径保存
-*/
+// CopyFile 保存文件，如果 savePath 的父路径不存在则自动创建
 func CopyFile(filePath, savePath string) error {
-	// 打开文件
-	file, err := os.Open(filePath)
-	if err != nil {
-		return err
+	// 创建目标目录（如果不存在）
+	if err := os.MkdirAll(filepath.Dir(savePath), os.ModePerm); err != nil {
+		return fmt.Errorf("无法创建目标目录: %w", err)
 	}
-	defer file.Close()
-	dst, err := os.Create(savePath)
-	defer dst.Close()
+
+	// 打开源文件
+	srcFile, err := os.Open(filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("无法打开源文件: %w", err)
 	}
-	_, err = io.Copy(dst, file)
+	defer srcFile.Close()
+
+	// 创建目标文件
+	dstFile, err := os.Create(savePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("无法创建目标文件: %w", err)
 	}
+	defer dstFile.Close()
+
+	// 复制文件内容
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return fmt.Errorf("文件复制失败: %w", err)
+	}
+
 	return nil
 }
 

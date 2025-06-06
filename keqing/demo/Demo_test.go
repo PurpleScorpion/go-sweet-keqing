@@ -18,6 +18,32 @@ type dog struct {
 	Age  int
 }
 
+func TestDemo31(t *testing.T) {
+	filePath := "D:\\img\\哈哈.jpg"
+	savePath := "D:\\imgs\\haha\\哈哈.jpg"
+	err := keqing.CopyFile(filePath, savePath)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+func TestDemo30(t *testing.T) {
+
+	random := keqing.WinningRate(0.2)
+	random2 := keqing.WinningRate(0.02)
+	random3 := keqing.WinningRate(80)
+	fmt.Println(random, random2, random3)
+}
+func TestDemo29(t *testing.T) {
+
+	random := keqing.Random()
+	for i := 0; i < 10; i++ {
+		random1 := keqing.RandomNextInt(100)
+		fmt.Println(random1)
+	}
+	random2 := keqing.RandomNextInt(100, 1000)
+	random3 := keqing.RandomId()
+	fmt.Println(random, random2, random3)
+}
 func TestDemo28(t *testing.T) {
 
 	str := "ems-dev"

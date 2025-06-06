@@ -208,6 +208,16 @@
    仅供学习参考，更多详细使用请查看google的uuid实现: https://github.com/google/uuid
   ```
 
+### 随机数工具类
+  ```text
+   Random() float64 // 获取0-1之间的随机数, [0,1)
+   RandomNextInt(max int) int // 获取0-max之间的随机数, [0,max)
+   RandomNextInt(min,max int) int // 获取min-max之间的随机数, [min,max)
+   RandomId() int64 // 使用雪花算法获取一个随机的ID
+   WinningRate(num float64) bool // 根据输入的概率,  返回是否中奖 最高支持0.000001%精度
+  ```
+
+
 ### 字符串工具类
    ```text
     Replace2Regex(str,oldStr,newStr) string // 将字符串中的oldStr替换成newStr , 使用正则表达式
