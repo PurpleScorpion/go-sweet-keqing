@@ -249,4 +249,6 @@
     Split(str,sep) []string // 将字符串按照sep分割成字符串数组
     StartWith(str,prefix) bool // 判断字符串是否以prefix开头
     EndWith(str,suffix) bool // 判断字符串是否以suffix结尾
+    Camel2Hyphen(str) string // 驼峰转连字符(或称呼为中划线, 例如: keqing-yun)
+    Camel2WebURL(str) string // 驼峰转web url标准格式的字符串(中划线拼接的方式)
    ```

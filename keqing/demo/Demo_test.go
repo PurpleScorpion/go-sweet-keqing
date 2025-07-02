@@ -18,6 +18,16 @@ type dog struct {
 	Age  int
 }
 
+func TestDemo32(t *testing.T) {
+	str := keqing.Camel2WebURL("autoChargeDischargeSchedule")
+	str2 := keqing.Camel2WebURL("AutoChargeDischargeSchedule")
+	str3 := keqing.Camel2Hyphen("autoChargeDischargeSchedule")
+	str4 := keqing.Camel2Hyphen("AutoChargeDischargeSchedule")
+	fmt.Println(str)
+	fmt.Println(str2)
+	fmt.Println(str3)
+	fmt.Println(str4)
+}
 func TestDemo31(t *testing.T) {
 	filePath := "D:\\img\\哈哈.jpg"
 	savePath := "D:\\imgs\\haha\\哈哈.jpg"

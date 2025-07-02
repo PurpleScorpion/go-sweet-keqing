@@ -287,6 +287,18 @@ func Camel2Snake(s string) string {
 	return smallCamelToSnake(s)
 }
 
+// 驼峰转中划线
+func Camel2Hyphen(s string) string {
+	return strings.ReplaceAll(Camel2Snake(s), "_", "-")
+}
+
+// web URL 中划线转换
+func Camel2WebURL(s string) string {
+	// 首字母变小写
+	s = ToFirstLowerCase(s)
+	return strings.ReplaceAll(Camel2Snake(s), "_", "-")
+}
+
 func bigCamelToSnake(s string) string {
 	var snakeCase strings.Builder
 
