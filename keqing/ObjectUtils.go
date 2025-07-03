@@ -10,10 +10,26 @@ func GetList[T any](data interface{}) []T {
 	if data == nil {
 		return nil
 	}
-	// 类型断言
+
+	// 情况 1: data 是 *[]T
+	if ptr, ok := data.(*[]T); ok {
+		return *ptr
+	}
+
+	// 情况 2: data 是 []*T，需要转换成 []T
+	if ptrList, ok := data.([]*T); ok {
+		res := make([]T, len(ptrList))
+		for i := range ptrList {
+			res[i] = *ptrList[i]
+		}
+		return res
+	}
+
+	// 情况 3: data 是 []T
 	if list, ok := data.([]T); ok {
 		return list
 	}
+
 	return nil
 }
 
