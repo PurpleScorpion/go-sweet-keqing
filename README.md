@@ -16,6 +16,35 @@
     使用以下语句来引入包
     import "github.com/PurpleScorpion/go-sweet-keqing/keqing"
    ```
+### Set集合
+   ```text
+    Set集合
+    说明: 与Java中的Set集合类似 , 集合中的元素不能重复 , 但是集合中的元素是存取有序的
+    使用方式: 
+    set := keqing.NewSet[string](nil) // 基本使用方式
+    set := keqing.NewSet[int](nil) // 基本使用方式
+    ...
+    // 更多复杂使用方式,请查阅 demo/Set_test.go#TestSet3 和 demo/Set_test.go#TestSet4
+   
+    Add(T) bool // 添加元素 , 返回是否添加成功
+    Contains(T) bool // 判断元素是否存在
+    Remove(T) bool // 删除元素 , 返回是否删除成功
+    Clear() // 清空集合
+    Size() int // 集合大小
+    GetAll() []T // 获取所有元素 , 返回一个切片(例如: []int)
+    IsEmpty() bool // 判断集合是否为空
+    Iterator() // 迭代器 , 具体使用方式请查阅 demo/Set_test.go#TestSet1
+    Union(Set[T]) Set[T] // 集合并集
+    Intersect(Set[T]) Set[T] // 交集
+    Difference(Set[T]) Set[T] // 求两个集合的差集（属于 set 不属于 other 的元素）
+    ToString() string // 符合json规则的格式化输出
+    RemoveAll(items ...T) // 批量删除多个元素
+    RetainAll(items ...T) // 保留指定元素
+    Filter(f func(item T) bool) Set[T] // 按条件筛选集合中的元素 , 不会修改原数组
+    
+    完成demo示例请查阅 demo/Set_test.go
+   ```
+
 ### 数组工具类
    ```text
     ArrayContains(arr,value) bool //判断数组是否包含某个值
