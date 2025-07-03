@@ -216,7 +216,12 @@
    RandomId() int64 // 使用雪花算法获取一个随机的ID
    WinningRate(num float64) bool // 根据输入的概率,  返回是否中奖 最高支持0.000001%精度
   ```
-
+### 类型工具类
+  ```text
+    GetList[泛型](obj interface{}) []T // 将一个interface{}对象转换为指定类型的列表
+    GetObject[泛型](obj interface{}) T // 将一个interface{}对象转换为指定类型的对象
+    
+  ```
 
 ### 字符串工具类
    ```text

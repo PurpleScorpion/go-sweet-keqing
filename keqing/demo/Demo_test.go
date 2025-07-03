@@ -18,6 +18,80 @@ type dog struct {
 	Age  int
 }
 
+func TestDemo34(t *testing.T) {
+	var obj interface{}
+	obj1 := animal{
+		Jinmao: dog{
+			Name: "金毛aaa",
+			Age:  10,
+		},
+		Dogs: []dog{
+			{
+				Name: "哈士奇",
+				Age:  5,
+			},
+			{
+				Name: "rottweiler",
+				Age:  8,
+			},
+		},
+	}
+	obj = obj1
+	//fmt.Println(keqing.ToString(obj))
+
+	object := keqing.GetObject[animal](obj)
+	fmt.Println(object.Dogs[0].Name)
+}
+
+func TestDemo33(t *testing.T) {
+	var obj interface{}
+	obj1 := animal{
+		Jinmao: dog{
+			Name: "金毛",
+			Age:  10,
+		},
+		Dogs: []dog{
+			{
+				Name: "哈士奇",
+				Age:  5,
+			},
+			{
+				Name: "rottweiler",
+				Age:  8,
+			},
+		},
+	}
+	obj2 := animal{
+		Jinmao: dog{
+			Name: "金毛2",
+			Age:  10,
+		},
+		Dogs: []dog{
+			{
+				Name: "哈士奇2",
+				Age:  5,
+			},
+			{
+				Name: "rottweiler2",
+				Age:  8,
+			},
+		},
+	}
+
+	var animals []animal
+	animals = append(animals, obj1)
+	animals = append(animals, obj2)
+
+	obj = animals
+
+	//fmt.Println(keqing.ToString(obj))
+
+	list := keqing.GetList[animal](obj)
+
+	fmt.Println(list[0].Jinmao.Name)
+
+}
+
 func TestDemo32(t *testing.T) {
 	str := keqing.Camel2WebURL("autoChargeDischargeSchedule")
 	str2 := keqing.Camel2WebURL("AutoChargeDischargeSchedule")
