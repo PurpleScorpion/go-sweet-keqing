@@ -18,6 +18,65 @@ type dog struct {
 	Age  int
 }
 
+type dogVO struct {
+	Name string
+	Age  int
+}
+
+func TestDemo37(t *testing.T) {
+	obj1 := animal{
+		Jinmao: dog{
+			Name: "金毛aaa",
+			Age:  10,
+		},
+		Dogs: []dog{
+			{
+				Name: "哈士奇",
+				Age:  5,
+			},
+			{
+				Name: "rottweiler",
+				Age:  8,
+			},
+		},
+	}
+	var obj2 animal
+	keqing.CopyProperties(&obj2, obj1, "Jinmao")
+	fmt.Println(keqing.ToString(obj2))
+}
+func TestDemo36(t *testing.T) {
+	dog1 := dog{
+		Name: "金毛",
+		Age:  10,
+	}
+	var dvo dogVO
+	//keqing.CopyProperties(&dvo, dog1)
+	keqing.CopyProperties(&dvo, &dog1)
+	fmt.Println(keqing.ToString(dvo))
+}
+func TestDemo35(t *testing.T) {
+	dog1 := dog{
+		Name: "金毛",
+		Age:  10,
+	}
+	dog2 := dog{
+		Name: "rottweiler",
+		Age:  8,
+	}
+
+	var dogs []dog
+	dogs = append(dogs, dog1)
+	dogs = append(dogs, dog2)
+
+	list := keqing.ArrayMap(dogs, func(item dog) dogVO {
+		var tmp dogVO
+		keqing.CopyProperties(&tmp, item)
+		return tmp
+	})
+
+	fmt.Println(keqing.ToString(list))
+}
+
 func TestDemo34(t *testing.T) {
 	var obj interface{}
 	obj1 := animal{

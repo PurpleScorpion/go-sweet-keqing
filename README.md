@@ -220,7 +220,8 @@
   ```text
     GetList[泛型](obj interface{}) []T // 将一个interface{}对象转换为指定类型的列表
     GetObject[泛型](obj interface{}) T // 将一个interface{}对象转换为指定类型的对象
-    
+    ArrayMap(slice []S, fn func(S) T) []T // 将一个切片类型转换为另一个切片类型 (具体使用查看TestDemo35)
+    CopyProperties(dst, src interface{}, ignoreFields ...string) // 复制对象属性,其中ignoreFields是可选项, 表示忽略的字段 (具体使用查看TestDemo37)
   ```
 
 ### 字符串工具类

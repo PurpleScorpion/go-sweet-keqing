@@ -34,6 +34,19 @@ func ArrayContains(obj interface{}, value interface{}) bool {
 	return false
 }
 
+// ArrayMap 将一个切片类型转换为另一个切片类型
+func ArrayMap[S any, T any](slice []S, fn func(S) T) []T {
+	if slice == nil {
+		return nil
+	}
+
+	res := make([]T, len(slice))
+	for i, v := range slice {
+		res[i] = fn(v)
+	}
+	return res
+}
+
 /*
 获取数组第0个元素
 */
