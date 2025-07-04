@@ -633,6 +633,20 @@ func (l *List[T]) Copy() *List[T] {
 
 	return copyList
 }
+
+func (l *List[T]) ToSet() *Set[T] {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+
+	set := NewSet[T](l.hashFunc)
+
+	for _, item := range l.data {
+		set.Add(item)
+	}
+
+	return set
+}
+
 func (l *List[T]) ToString() string {
-	return ToString(l.GetData())
+	return ToJsonString(l.GetData())
 }

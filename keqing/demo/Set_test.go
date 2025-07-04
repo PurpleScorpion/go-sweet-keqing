@@ -168,3 +168,42 @@ func TestSet_Union(t *testing.T) {
 	set2.Add(4)
 	fmt.Println("set1 & set2:", set1.Union(set2).ToString())
 }
+
+// 测试 Sort 方法：按 age 排序
+func TestSet_ToList(t *testing.T) {
+	set := keqing.NewSet[Cat](nil)
+
+	set.Add(Cat{Name: "Alice", Age: 30})
+	set.Add(Cat{Name: "Bob", Age: 25})
+	set.Add(Cat{Name: "Charlie", Age: 35})
+	set.Add(Cat{Name: "Charlie", Age: 35})
+
+	list := set.ToList()
+
+	fmt.Println(list.ToString())
+	fmt.Println(set.ToString())
+}
+
+// 测试 Sort 方法：按 age 排序
+func TestSet_Set2Map(t *testing.T) {
+	set := keqing.NewSet[Cat](nil)
+
+	set.Add(Cat{Name: "Alice", Age: 30})
+	set.Add(Cat{Name: "Bob", Age: 25})
+	set.Add(Cat{Name: "Charlie", Age: 35})
+	set.Add(Cat{Name: "Charlie", Age: 35})
+
+	res := keqing.Set2Map(set, func(cat Cat) string {
+		return cat.Name
+	}, keqing.OverwriteFirst)
+
+	fmt.Println(set.ToString())
+	fmt.Println(keqing.ToJsonString(res))
+}
+
+func TestSet_AsSet(t *testing.T) {
+	// 写一个数组
+	arr := []int{1, 2, 3, 3, 4, 5}
+	set := keqing.AsSet(arr, nil)
+	fmt.Println(set.ToString())
+}

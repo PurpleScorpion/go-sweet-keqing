@@ -188,3 +188,42 @@ func TestList_Sort_CustomStruct(t *testing.T) {
 	fmt.Println(list.ToString())
 	fmt.Println(list.GetFirst())
 }
+
+// 测试 Sort 方法：按 age 排序
+func TestList_ToSet(t *testing.T) {
+	list := keqing.NewList[Cat](nil)
+
+	list.Add(Cat{Name: "Alice", Age: 30})
+	list.Add(Cat{Name: "Bob", Age: 25})
+	list.Add(Cat{Name: "Charlie", Age: 35})
+	list.Add(Cat{Name: "Charlie", Age: 35})
+
+	set := list.ToSet()
+
+	fmt.Println(list.ToString())
+	fmt.Println(set.ToString())
+}
+
+// 测试 Sort 方法：按 age 排序
+func TestList_List2Map(t *testing.T) {
+	list := keqing.NewList[Cat](nil)
+
+	list.Add(Cat{Name: "Alice", Age: 30})
+	list.Add(Cat{Name: "Bob", Age: 25})
+	list.Add(Cat{Name: "Charlie", Age: 35})
+	list.Add(Cat{Name: "Charlie", Age: 36})
+
+	res := keqing.List2Map(list, func(cat Cat) string {
+		return cat.Name
+	}, keqing.OverwriteFirst)
+
+	fmt.Println(list.ToString())
+	fmt.Println(keqing.ToJsonString(res))
+}
+
+func TestList_AsList(t *testing.T) {
+	// 写一个数组
+	arr := []int{1, 2, 3, 4, 5}
+	list := keqing.AsList(arr, nil)
+	fmt.Println(list.ToString())
+}

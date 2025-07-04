@@ -1,6 +1,7 @@
 package keqing
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -160,7 +161,7 @@ func (s *Set[T]) addAll(items ...T) {
 }
 
 func (s *Set[T]) ToString() string {
-	return ToString(s.GetData())
+	return ToJsonString(s.GetData())
 }
 
 // Remove 删除指定元素，返回是否删除成功
@@ -286,4 +287,16 @@ func (s *Set[T]) DeepCopy(cloneFunc func(T) T) *Set[T] {
 	}
 
 	return copySet
+}
+
+// ToList 将 Set 转换为 List
+func (s *Set[T]) ToList() *List[T] {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	list := NewList[T](s.hashFunc)
+	for _, item := range s.data {
+		list.Add(item)
+	}
+	return list
 }

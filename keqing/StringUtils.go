@@ -1,6 +1,7 @@
 package keqing
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -79,6 +80,14 @@ func Contains(mainStr, substr string) bool {
 	return strings.Contains(mainStr, substr)
 }
 
+func ToJsonString(data any) string {
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return ""
+	}
+	return string(jsonBytes)
+}
+
 /*
 将 数组 / 结构体 转换为标准字符串打印
 */
@@ -98,19 +107,35 @@ func ToString(obj interface{}) string {
 }
 
 func map2Str(obj interface{}) string {
-	mymap := obj.(map[string]interface{})
+	v := reflect.ValueOf(obj)
+	if v.Kind() != reflect.Map {
+		return "{}"
+	}
+
 	var result []string
-	for key, value := range mymap {
-		if isStruct(value) {
-			result = append(result, fmt.Sprintf("%s: %v", key, struct2Str(value)))
-		} else if isMap(value) {
-			result = append(result, fmt.Sprintf("%s: %v", key, map2Str(value)))
-		} else if isSlice(value) {
-			result = append(result, fmt.Sprintf("%s: %v", key, array2Str(value)))
-		} else {
-			result = append(result, fmt.Sprintf("%s: %v", key, value))
+	for _, keyVal := range v.MapKeys() {
+		key := fmt.Sprintf("%v", keyVal.Interface())
+		value := v.MapIndex(keyVal).Interface()
+
+		// 对 value 做类型判断并递归处理结构体、slice、map 等
+		switch val := value.(type) {
+		case struct{}:
+			result = append(result, fmt.Sprintf("%s: %v", key, struct2Str(val)))
+		case map[string]interface{}:
+			result = append(result, fmt.Sprintf("%s: %v", key, map2Str(val)))
+		default:
+			if isStruct(val) {
+				result = append(result, fmt.Sprintf("%s: %v", key, struct2Str(val)))
+			} else if isMap(val) {
+				result = append(result, fmt.Sprintf("%s: %v", key, map2Str(val)))
+			} else if isSlice(val) {
+				result = append(result, fmt.Sprintf("%s: %v", key, array2Str(val)))
+			} else {
+				result = append(result, fmt.Sprintf("%s: %v", key, val))
+			}
 		}
 	}
+
 	return "{" + strings.Join(result, ", ") + "}"
 }
 

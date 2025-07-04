@@ -45,8 +45,9 @@
     Filter(f func(item T) bool) Set[T] // 按条件筛选集合中的元素 , 不会修改原数组
     Copy() Set[T] // 返回一个新的 Set，包含当前 Set 的所有元素（浅拷贝）
     DeepCopy() Set[T] // 创建一个新的 Set，包含当前 Set 的所有元素（深拷贝）
+    ToList() List[T] // 将列表转换为 List
     
-    完成demo示例请查阅 demo/Set_test.go
+    完整demo示例请查阅 demo/Set_test.go
    ```
 ### List 集合
   ```text
@@ -86,8 +87,21 @@
     Sort(less func(a, b T) bool) // 对列表进行排序，接受一个比较函数 less(a, b T) bool，表示 a 是否应排在 b 前面
     SortDESC() // 对基本类型列表进行降序排序（仅支持 string/int/float）
     SortASC() // 对基本类型列表进行升序排序（仅支持 string/int/float）
+    ToSet() Set[T] // 将列表转换为 Set
+    
+    完整demo示例请查阅 demo/List_test.go
   ```
-
+### Collections工具类
+      
+   ```text
+        集合工具类 , 对List和Set集合进行增强操作
+        List2Map[T comparable, K comparable]( list *List[T], keyFunc func(T) K, onConflict int) // List集合转为Map集合 , 支持 key 冲突策略
+        AsList(arr []T) *List[T] // 将数组转换为 List
+        Set2Map[T comparable, K comparable]( set *Set[T], keyFunc func(T) K, onConflict int) // Set集合转为Map集合 , 支持 key 冲突策略
+        AsSet(arr []T) *Set[T] // 将数组转换为 Set
+        
+        完整demo示例请查阅 demo/List_test.go 和 demo/Set_test.go
+   ```
 
 ### 数组工具类
    ```text
