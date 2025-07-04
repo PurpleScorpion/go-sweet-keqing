@@ -1,23 +1,8 @@
 package keqing
 
 import (
-	"fmt"
-	"hash/fnv"
 	"sync"
 )
-
-// Hashable 接口用于自定义对象实现 hash 计算
-type Hashable interface {
-	Hash() uint64
-}
-
-// 默认使用 FNV-1a 算法计算 hash 值
-func defaultHash(obj any) uint64 {
-	s := fmt.Sprintf("%v", obj)
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(s))
-	return h.Sum64()
-}
 
 // Set 是一个线程安全、可自定义 hash 函数的集合结构
 type Set[T comparable] struct {
@@ -66,11 +51,23 @@ func (s *Set[T]) Contains(value T) bool {
 }
 
 // GetAll 获取所有元素切片
+// Deprecated: Use NewMethod instead.
 func (s *Set[T]) GetAll() []T {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	return append([]T(nil), s.data...)
+}
+
+func (s *Set[T]) GetData() []T {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return append([]T(nil), s.data...)
+}
+
+func (s *Set[T]) ToArray() []T {
+	return s.GetData()
 }
 
 // Size 返回集合大小
@@ -163,7 +160,7 @@ func (s *Set[T]) addAll(items ...T) {
 }
 
 func (s *Set[T]) ToString() string {
-	return ToString(s.GetAll())
+	return ToString(s.GetData())
 }
 
 // Remove 删除指定元素，返回是否删除成功
@@ -201,11 +198,6 @@ func (s *Set[T]) equal(a, b T) bool {
 		return s.hashFunc(a) == s.hashFunc(b)
 	}
 	return false
-}
-
-// comparableEqual 接口用于支持自定义相等判断
-type comparableEqual[T any] interface {
-	Equal(T) bool
 }
 
 // RemoveAll 批量删除多个元素
@@ -266,4 +258,32 @@ func (s *Set[T]) Filter(predicate func(T) bool) *Set[T] {
 	}
 
 	return newSet
+}
+
+// Copy 返回一个新的 Set，包含当前 Set 的所有元素（浅拷贝）
+func (s *Set[T]) Copy() *Set[T] {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	copySet := NewSet[T](s.hashFunc)
+
+	for _, item := range s.data {
+		copySet.Add(item)
+	}
+
+	return copySet
+}
+
+// DeepCopy 返回一个新的 Set，使用 cloneFunc 对每个元素进行深拷贝
+func (s *Set[T]) DeepCopy(cloneFunc func(T) T) *Set[T] {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	copySet := NewSet[T](s.hashFunc)
+
+	for _, item := range s.data {
+		copySet.Add(cloneFunc(item))
+	}
+
+	return copySet
 }

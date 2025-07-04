@@ -31,7 +31,9 @@
     Remove(T) bool // 删除元素 , 返回是否删除成功
     Clear() // 清空集合
     Size() int // 集合大小
-    GetAll() []T // 获取所有元素 , 返回一个切片(例如: []int)
+    已弃用 - GetAll() []T // 获取所有元素 , 返回一个切片(例如: []int) 
+    GetData() []T // 获取所有元素 , 返回一个切片(例如: []int) 
+    ToArray() []T // 获取所有元素 , 返回一个切片(例如: []int) 
     IsEmpty() bool // 判断集合是否为空
     Iterator() // 迭代器 , 具体使用方式请查阅 demo/Set_test.go#TestSet1
     Union(Set[T]) Set[T] // 集合并集
@@ -41,9 +43,51 @@
     RemoveAll(items ...T) // 批量删除多个元素
     RetainAll(items ...T) // 保留指定元素
     Filter(f func(item T) bool) Set[T] // 按条件筛选集合中的元素 , 不会修改原数组
+    Copy() Set[T] // 返回一个新的 Set，包含当前 Set 的所有元素（浅拷贝）
+    DeepCopy() Set[T] // 创建一个新的 Set，包含当前 Set 的所有元素（深拷贝）
     
     完成demo示例请查阅 demo/Set_test.go
    ```
+### List 集合
+  ```text
+    List集合
+    说明: 与Java中的List集合类似 , 集合中的元素可以重复 , 集合中的元素是存取有序的
+    使用方式:
+    list := keqing.NewList[string](nil)
+    list := keqing.NewList[int](nil)
+    ...
+    // 更多复杂使用方式,请查阅 demo/List_test.go
+    Add(T) bool // 添加元素 , 返回是否添加成功
+    Get(index) T // 获取指定索引位置的元素
+    Set(index,value) bool // 替换指定索引位置的元素，并更新 hash 映射
+    Contains(value) bool // 判断元素是否存在
+    IndexOf(value) int // 获取指定元素在集合中的索引位置
+    LastIndexOf(value) int // 返回最后一个匹配项的索引位置，不存在则返回 -1
+    GetData() []T // 获取所有元素 , 返回一个切片(例如: []int) 
+    ToArray() []T // 获取所有元素 , 返回一个切片(例如: []int) 
+    Size() int // 集合大小
+    GetFirst()  T // 获取第一个元素
+    GetLast()  T // 获取最后一个元素
+    IsEmpty() bool // 判断集合是否为空
+    Remove(T) bool // 删除元素 , 返回是否删除成功
+    RemoveAt(index) bool // 删除指定索引位置的元素
+    Iterator() // 迭代器
+    Union(List[T]) List[T] // 集合并集
+    Intersect(List[T]) List[T] // 交集
+    Difference(List[T]) List[T] // 求两个集合的差集（属于 list 不属于 other 的元素）
+    ToString() string // 符合json规则的格式化输出
+    RemoveAll(items ...T) // 批量删除多个元素
+    RetainAll(items ...T) // 保留指定元素
+    Filter(f func(item T) bool) List[T] // 按条件筛选集合中的元素 , 不会修改原数组
+    Copy() List[T] // 返回一个新的 List，包含当前 List 的所有元素（浅拷贝）
+    DeepCopy() List[T] // 创建一个新的 List，包含当前 List 的所有元素（深拷贝）
+    SubList(index) List[T] // 返回一个新的 List，表示原列表的一个子集, 从 start 开始到末尾
+    SubList(start,end) List[T] // 返回一个新的 List，表示原列表的一个子集, 从 start（包含）到 end（不包含）
+    Sort(less func(a, b T) bool) // 对列表进行排序，接受一个比较函数 less(a, b T) bool，表示 a 是否应排在 b 前面
+    SortDESC() // 对基本类型列表进行降序排序（仅支持 string/int/float）
+    SortASC() // 对基本类型列表进行升序排序（仅支持 string/int/float）
+  ```
+
 
 ### 数组工具类
    ```text

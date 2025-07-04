@@ -98,7 +98,7 @@ func TestDemo34(t *testing.T) {
 	obj = obj1
 	//fmt.Println(keqing.ToString(obj))
 
-	object := keqing.GetObject[animal](obj)
+	object := keqing.ToObject[animal](obj)
 	fmt.Println(object.Dogs[0].Name)
 }
 
@@ -145,7 +145,7 @@ func TestDemo33(t *testing.T) {
 
 	//fmt.Println(keqing.ToString(obj))
 
-	list := keqing.GetList[animal](obj)
+	list := keqing.ToArray[animal](obj)
 
 	fmt.Println(list[0].Jinmao.Name)
 
