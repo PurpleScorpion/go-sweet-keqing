@@ -320,6 +320,7 @@
     GetBytes(str) []byte // 将字符串解析成byte数组
     Contains(str,subStr) bool // 判断字符串是否包含subStr
     ToString(value) string // 将 数组 / 结构体 转换为标准字符串打印
+    ToJsonString(value) string // 将 数组 / 结构体 转换为标准Json字符串打印
     ToStringArray(arr) []string // 将数组转换为字符串数组
     ToFirstUpperCase(str) string // 将字符串的首字母转换为大写
     ToFirstLowerCase(str) string // 将字符串的首字母转换为小写
