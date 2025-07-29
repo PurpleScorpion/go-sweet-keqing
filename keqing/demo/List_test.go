@@ -173,15 +173,30 @@ type Cat struct {
 	Age  int
 }
 
+type Dog struct {
+	Name string
+	Age  int
+	Hah  []string
+}
+
 // 测试 Sort 方法：按 age 排序
 func TestList_Sort_CustomStruct(t *testing.T) {
-	list := keqing.NewList[Cat](nil)
+	// 方案1
+	//list := keqing.NewList[*Dog](nil)
 
-	list.Add(Cat{Name: "Alice", Age: 30})
-	list.Add(Cat{Name: "Bob", Age: 25})
-	list.Add(Cat{Name: "Charlie", Age: 35})
+	// 方案2 使用指针类型，指针是可比较的
+	list := keqing.NewList[*Dog](func(cat *Dog) uint64 {
+		if cat == nil {
+			return 0
+		}
+		return uint64(cat.Age)
+	})
 
-	list.Sort(func(a, b Cat) bool {
+	list.Add(&Dog{Name: "Alice", Age: 30})
+	list.Add(&Dog{Name: "Bob", Age: 25})
+	list.Add(&Dog{Name: "Charlie", Age: 35})
+
+	list.Sort(func(a, b *Dog) bool {
 		return a.Age > b.Age
 	})
 

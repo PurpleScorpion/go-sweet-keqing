@@ -48,6 +48,7 @@
     ToList() List[T] // 将列表转换为 List
     
     完整demo示例请查阅 demo/Set_test.go
+    注意: 包含切片类型的实体类请参考 demo/List_test.go#TestList_Sort_CustomStruct
    ```
 ### List 集合
   ```text
@@ -90,6 +91,7 @@
     ToSet() Set[T] // 将列表转换为 Set
     
     完整demo示例请查阅 demo/List_test.go
+    注意: 包含切片类型的实体类请参考 demo/List_test.go#TestList_Sort_CustomStruct
   ```
 ### Collections工具类
       
