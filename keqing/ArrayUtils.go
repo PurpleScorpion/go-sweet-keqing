@@ -15,20 +15,10 @@ func ArrayContains(obj interface{}, value interface{}) bool {
 	if !isSlice(obj) {
 		return false
 	}
-	// 获取 obj 的反射值
-	objVal := reflect.ValueOf(obj)
-	// 获取 value 的反射值
-	valueVal := reflect.ValueOf(value)
-
-	// 遍历切片
-	for i := 0; i < objVal.Len(); i++ {
-		elem := objVal.Index(i)
-		// 检查元素类型是否与 value 相同
-		if elem.Type() == valueVal.Type() {
-			// 使用 reflect.DeepEqual 比较值
-			if reflect.DeepEqual(elem.Interface(), value) {
-				return true
-			}
+	values := reflect.ValueOf(obj)
+	for i := 0; i < values.Len(); i++ {
+		if reflect.DeepEqual(values.Index(i).Interface(), value) {
+			return true
 		}
 	}
 	return false
@@ -196,16 +186,16 @@ func SortArrayDesc(obj interface{}) {
 		return
 	case reflect.Int64:
 		// 如果是 int64 切片，则进行倒序排序
-		slice := make([]int, val.Len())
+		slice := make([]int64, val.Len())
 		for i := 0; i < val.Len(); i++ {
-			slice[i] = int(val.Index(i).Int())
+			slice[i] = val.Index(i).Int()
 		}
 		sort.Slice(slice, func(i, j int) bool {
 			return slice[i] > slice[j]
 		})
 		// 将排序后的切片替换到原始切片中
 		for i := 0; i < val.Len(); i++ {
-			val.Index(i).SetInt(int64(slice[i]))
+			val.Index(i).SetInt(slice[i])
 		}
 		return
 	case reflect.Float32:
@@ -242,7 +232,7 @@ func SortArrayDesc(obj interface{}) {
 		// 如果是 string 切片，则进行倒序排序
 		slice := make([]string, val.Len())
 		for i := 0; i < val.Len(); i++ {
-			slice[i] = val.Index(i).Interface().(string)
+			slice[i] = val.Index(i).String()
 		}
 		sort.Slice(slice, func(i, j int) bool {
 			return slice[i] > slice[j]
@@ -300,14 +290,14 @@ func SortArray(obj interface{}) {
 		return
 	case reflect.Int64:
 		// 如果是 int 切片，则进行排序
-		slice := make([]int, val.Len())
+		slice := make([]int64, val.Len())
 		for i := 0; i < val.Len(); i++ {
-			slice[i] = int(val.Index(i).Int())
+			slice[i] = val.Index(i).Int()
 		}
-		sort.Ints(slice)
+		sort.Slice(slice, func(i, j int) bool { return slice[i] < slice[j] })
 		// 将排序后的切片替换到原始切片中
 		for i := 0; i < val.Len(); i++ {
-			val.Index(i).SetInt(int64(slice[i]))
+			val.Index(i).SetInt(slice[i])
 		}
 		return
 	case reflect.Float32:
@@ -338,7 +328,7 @@ func SortArray(obj interface{}) {
 		// 如果是 string 切片，则进行排序
 		slice := make([]string, val.Len())
 		for i := 0; i < val.Len(); i++ {
-			slice[i] = val.Index(i).Interface().(string)
+			slice[i] = val.Index(i).String()
 		}
 		sort.Strings(slice)
 		// 将排序后的切片替换到原始切片中

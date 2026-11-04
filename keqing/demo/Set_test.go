@@ -2,9 +2,10 @@ package demo
 
 import (
 	"fmt"
-	"github.com/PurpleScorpion/go-sweet-keqing/keqing"
 	"hash/fnv"
 	"testing"
+
+	"github.com/PurpleScorpion/go-sweet-keqing/keqing"
 )
 
 type User struct {
@@ -28,6 +29,7 @@ func TestSet1(t *testing.T) {
 	set.Add("aaa")
 
 	fmt.Println(set.ToString())
+	assertDemoEqual(t, set.GetData(), []string{"bbb", "aaa", "ccc", "ddd"})
 }
 
 // 基本数据类型移除
@@ -42,6 +44,7 @@ func TestSet2(t *testing.T) {
 	set.Remove("aaa")
 
 	fmt.Println(set.ToString())
+	assertDemoEqual(t, set.GetData(), []string{"bbb", "ccc", "ddd"})
 }
 
 // 对象类型添加
@@ -56,6 +59,7 @@ func TestSet3(t *testing.T) {
 	set.Add(User{UserName: "bbb"})
 
 	fmt.Println(set.ToString())
+	assertDemoEqual(t, set.Size(), 4)
 }
 
 // 对象类型添加 - 自定义Hash函数
@@ -74,6 +78,10 @@ func TestSet4(t *testing.T) {
 	set.Add(User{UserName: "bbb"})
 
 	fmt.Println(set.ToString())
+	assertDemoEqual(t, set.Size(), 4)
+	// A hash collision does not define equality; different Age values are distinct.
+	assertDemoEqual(t, set.Add(User{UserName: "bbb", Age: 1}), true)
+	assertDemoEqual(t, set.Size(), 5)
 }
 
 func TestSet5(t *testing.T) {
@@ -109,6 +117,8 @@ func TestSet5(t *testing.T) {
 	newSet := set.Filter(func(i int) bool { return i > 3 })
 	fmt.Println("原始元素:", set.ToString())
 	fmt.Println("过滤大于 3 的元素后:", newSet.ToString())
+	assertDemoEqual(t, set.GetData(), []int{3, 5})
+	assertDemoEqual(t, newSet.GetData(), []int{5})
 }
 
 func TestSet6(t *testing.T) {
@@ -123,6 +133,9 @@ func TestSet6(t *testing.T) {
 	fmt.Println("vvv是否存在", set.Contains("vvv"))
 
 	fmt.Println("集合大小:", set.Size())
+	assertDemoEqual(t, set.Contains("aaa"), true)
+	assertDemoEqual(t, set.Contains("vvv"), false)
+	assertDemoEqual(t, set.Size(), 4)
 }
 
 // 求差集
@@ -138,6 +151,7 @@ func TestSet_Difference(t *testing.T) {
 	set2.Add(3)
 	fmt.Println("set1 - set2:", set1.Difference(set2).ToString())
 
+	assertDemoEqual(t, set1.Difference(set2).GetData(), []int{1})
 }
 
 // 求交集
@@ -153,6 +167,7 @@ func TestSet_Intersect(t *testing.T) {
 	set2.Add(3)
 	set2.Add(4)
 	fmt.Println("set1 & set2:", set1.Intersect(set2).ToString())
+	assertDemoEqual(t, set1.Intersect(set2).GetData(), []int{2, 3})
 }
 
 // 求并集
@@ -167,6 +182,7 @@ func TestSet_Union(t *testing.T) {
 	set2.Add(3)
 	set2.Add(4)
 	fmt.Println("set1 & set2:", set1.Union(set2).ToString())
+	assertDemoEqual(t, set1.Union(set2).GetData(), []int{1, 2, 3, 4})
 }
 
 // 测试 Sort 方法：按 age 排序
@@ -182,6 +198,8 @@ func TestSet_ToList(t *testing.T) {
 
 	fmt.Println(list.ToString())
 	fmt.Println(set.ToString())
+	assertDemoEqual(t, list.GetData(), set.GetData())
+	assertDemoEqual(t, list.Size(), 3)
 }
 
 // 测试 Sort 方法：按 age 排序
@@ -199,6 +217,8 @@ func TestSet_Set2Map(t *testing.T) {
 
 	fmt.Println(set.ToString())
 	fmt.Println(keqing.ToJsonString(res))
+	assertDemoEqual(t, len(res), 3)
+	assertDemoEqual(t, res["Charlie"], Cat{Name: "Charlie", Age: 35})
 }
 
 func TestSet_AsSet(t *testing.T) {
@@ -206,4 +226,5 @@ func TestSet_AsSet(t *testing.T) {
 	arr := []int{1, 2, 3, 3, 4, 5}
 	set := keqing.AsSet(arr, nil)
 	fmt.Println(set.ToString())
+	assertDemoEqual(t, set.GetData(), []int{1, 2, 3, 4, 5})
 }

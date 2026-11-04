@@ -76,5 +76,5 @@ func isStruct(obj interface{}) bool {
 }
 
 func isMap(obj interface{}) bool {
-	return reflect.TypeOf(obj).Kind() == reflect.Map
+	return obj != nil && reflect.TypeOf(obj).Kind() == reflect.Map
 }

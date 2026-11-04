@@ -1,12 +1,40 @@
 package demo
 
 import (
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/PurpleScorpion/go-sweet-keqing/keqing"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/PurpleScorpion/go-sweet-keqing/keqing"
 )
+
+// rsaDemoKeys creates an isolated PKIX public key and PKCS#8 private key.
+// Examples must not depend on checked-in keys or files on a developer's machine.
+func rsaDemoKeys(t *testing.T) (publicKey, privateKey string) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privateDER, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicDER, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: publicDER})),
+		string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateDER}))
+}
 
 type animal struct {
 	Jinmao dog
@@ -43,6 +71,7 @@ func TestDemo37(t *testing.T) {
 	var obj2 animal
 	keqing.CopyProperties(&obj2, obj1, "Jinmao")
 	fmt.Println(keqing.ToString(obj2))
+	assertDemoEqual(t, obj2, animal{Dogs: obj1.Dogs})
 }
 func TestDemo36(t *testing.T) {
 	dog1 := dog{
@@ -53,6 +82,7 @@ func TestDemo36(t *testing.T) {
 	//keqing.CopyProperties(&dvo, dog1)
 	keqing.CopyProperties(&dvo, &dog1)
 	fmt.Println(keqing.ToString(dvo))
+	assertDemoEqual(t, dvo, dogVO{Name: "金毛", Age: 10})
 }
 func TestDemo35(t *testing.T) {
 	dog1 := dog{
@@ -75,6 +105,7 @@ func TestDemo35(t *testing.T) {
 	})
 
 	fmt.Println(keqing.ToString(list))
+	assertDemoEqual(t, list, []dogVO{{Name: "金毛", Age: 10}, {Name: "rottweiler", Age: 8}})
 }
 
 func TestDemo34(t *testing.T) {
@@ -100,6 +131,7 @@ func TestDemo34(t *testing.T) {
 
 	object := keqing.ToObject[animal](obj)
 	fmt.Println(object.Dogs[0].Name)
+	assertDemoEqual(t, object, obj1)
 }
 
 func TestDemo33(t *testing.T) {
@@ -149,6 +181,7 @@ func TestDemo33(t *testing.T) {
 
 	fmt.Println(list[0].Jinmao.Name)
 
+	assertDemoEqual(t, list, animals)
 }
 
 func TestDemo32(t *testing.T) {
@@ -160,13 +193,34 @@ func TestDemo32(t *testing.T) {
 	fmt.Println(str2)
 	fmt.Println(str3)
 	fmt.Println(str4)
+	for _, got := range []string{str, str2, str3, str4} {
+		assertDemoEqual(t, got, "auto-charge-discharge-schedule")
+	}
 }
 func TestDemo31(t *testing.T) {
-	filePath := "D:\\img\\哈哈.jpg"
-	savePath := "D:\\imgs\\haha\\哈哈.jpg"
-	err := keqing.CopyFile(filePath, savePath)
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "哈哈.jpg")
+	savePath := filepath.Join(dir, "copies", "haha", "哈哈.jpg")
+	content := []byte("self-contained copy fixture\x00\xff")
+	if err := os.WriteFile(filePath, content, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := keqing.CopyFile(filePath, savePath); err != nil {
+		t.Fatal(err)
+	}
+	copied, err := os.ReadFile(savePath)
 	if err != nil {
-		fmt.Println(err)
+		t.Fatal(err)
+	}
+	if !bytes.Equal(copied, content) {
+		t.Fatalf("copied bytes = %q, want %q", copied, content)
+	}
+	original, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(original, content) {
+		t.Fatal("copy changed the source file")
 	}
 }
 func TestDemo30(t *testing.T) {
@@ -182,16 +236,29 @@ func TestDemo29(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		random1 := keqing.RandomNextInt(100)
 		fmt.Println(random1)
+		if random1 < 0 || random1 >= 100 {
+			t.Fatalf("RandomNextInt(100) = %d", random1)
+		}
 	}
 	random2 := keqing.RandomNextInt(100, 1000)
 	random3 := keqing.RandomId()
 	fmt.Println(random, random2, random3)
+	if random < 0 || random >= 1 {
+		t.Fatalf("Random() = %v", random)
+	}
+	if random2 < 100 || random2 >= 1000 {
+		t.Fatalf("RandomNextInt(100, 1000) = %d", random2)
+	}
+	if random3 <= 0 {
+		t.Fatalf("RandomId() = %d", random3)
+	}
 }
 func TestDemo28(t *testing.T) {
 
 	str := "ems-dev"
 	flag := keqing.StartWith(str, "ems-1")
 	fmt.Println(flag)
+	assertDemoEqual(t, flag, false)
 }
 func TestDemo27(t *testing.T) {
 
@@ -201,6 +268,7 @@ func TestDemo27(t *testing.T) {
 	days := keqing.GetDaysInMonth(now)
 	fmt.Println(days)
 
+	assertDemoEqual(t, days, 28)
 }
 
 func TestDemo26(t *testing.T) {
@@ -347,20 +415,25 @@ month_reduction_rate`
 }
 
 func TestDemo21(t *testing.T) {
-	var publicKeyStrEv = `-----BEGIN PUBLIC KEY-----
-公钥
------END PUBLIC KEY-----`
+	publicKeyPEM, privateKeyPEM := rsaDemoKeys(t)
+	publicKey := keqing.RsaLoadPublicKey(publicKeyPEM)
+	privateKey := keqing.RsaLoadPrivateKey(privateKeyPEM)
+	plaintext := "hahah"
+	token := keqing.RsaEncrypt4PKCS1(publicKey, plaintext)
+	if token == "" {
+		t.Fatal("PKCS1 encryption returned empty ciphertext")
+	}
+	assertDemoEqual(t, keqing.RsaDecrypt4PKCS1(privateKey, token), plaintext)
 
-	var privateKeyStrEv = `-----BEGIN RSA PRIVATE KEY-----
-私钥
------END RSA PRIVATE KEY-----`
-	rsaLoadPublicKey := keqing.RsaLoadPublicKey(publicKeyStrEv)
-	rsaLoadPrivateKey := keqing.RsaLoadPrivateKey(privateKeyStrEv)
-
-	token := keqing.RsaEncrypt4PKCS1(rsaLoadPublicKey, "hahah")
-	fmt.Println(token)
-	data := keqing.RsaDecrypt4PKCS1(rsaLoadPrivateKey, token)
-	fmt.Println(data)
+	// Preserve invalid-PEM examples as explicit negative tests.
+	t.Run("invalid public key", func(t *testing.T) {
+		assertPanic(t, func() { keqing.RsaLoadPublicKey("-----BEGIN PUBLIC KEY-----\n公钥\n-----END PUBLIC KEY-----") })
+	})
+	t.Run("invalid private key", func(t *testing.T) {
+		assertPanic(t, func() {
+			keqing.RsaLoadPrivateKey("-----BEGIN RSA PRIVATE KEY-----\n私钥\n-----END RSA PRIVATE KEY-----")
+		})
+	})
 }
 
 func TestDemo20(t *testing.T) {
@@ -412,60 +485,55 @@ func TestDemo18(t *testing.T) {
 }
 
 func TestDemo17(t *testing.T) {
-	keqing.RsaLoadKey("D:\\img\\publicKey.pem", "D:\\img\\privateKey.pem", keqing.RSA_KEY_FILE_TYPE)
-	str := keqing.RsaEncrypt("剑光如我,斩尽牛杂")
-	fmt.Println(str)
-	fmt.Println("-------------------")
-	data := keqing.RsaDecrypt(str)
-	fmt.Println(data)
+	publicKey, privateKey := rsaDemoKeys(t)
+	dir := t.TempDir()
+	publicPath := filepath.Join(dir, "publicKey.pem")
+	privatePath := filepath.Join(dir, "privateKey.pem")
+	if err := os.WriteFile(publicPath, []byte(publicKey), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(privatePath, []byte(privateKey), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := keqing.RsaLoadKey(publicPath, privatePath, keqing.RSA_KEY_FILE_TYPE); err != nil {
+		t.Fatal(err)
+	}
+	plaintext := "剑光如我,斩尽牛杂"
+	ciphertext := keqing.RsaEncrypt(plaintext)
+	if ciphertext == "" {
+		t.Fatal("OAEP encryption returned empty ciphertext")
+	}
+	assertDemoEqual(t, keqing.RsaDecrypt(ciphertext), plaintext)
 }
 func TestDemo16(t *testing.T) {
-	keqing.RsaGenerateKey("D:\\img")
+	dir := filepath.Join(t.TempDir(), "keys")
+	assertDemoEqual(t, keqing.RsaGenerateKey(dir), dir)
+	publicPEM, err := os.ReadFile(filepath.Join(dir, "publicKey.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	privatePEM, err := os.ReadFile(filepath.Join(dir, "privateKey.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKey := keqing.RsaLoadPublicKey(string(publicPEM))
+	privateKey := keqing.RsaLoadPrivateKey(string(privatePEM))
+	if publicKey.N.Cmp(privateKey.N) != 0 || publicKey.E != privateKey.E {
+		t.Fatal("generated public and private keys do not match")
+	}
+	if err := privateKey.Validate(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDemo15(t *testing.T) {
-	publicKey := `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuOP6JK8tT0WdIvMbK60T
-x/BrbuZN/tJn+HVXwh9xdDAyygMhpI7yfX1NFzkAtoBb9dCEbmvAtImSlq+grDMQ
-8qse/KI0W0viQLbIXwUdIaSx/qKYjUprYgBwlMN8woV99IB+SwZ7T5SHMb1LK6xM
-9ybaeiNxOPoeGy4S6YvEpC1tjtKKq8kpBlaN3psx5H2jeR//Jj/h4V/7trzWO5Em
-LgcC9jx4OazrAR85jOKgLo9L0KmKe6S4icQ8It7LN17BciqUKMrYQS0kj6R+HtoI
-3f79wNBLdTna3DYsF3YDLBrlPV8GB0PSTUTqNSoX42/qlZVuH8wz8TGpQijsRc/v
-3wIDAQAB
------END PUBLIC KEY-----`
-	privateKey := `-----BEGIN PRIVATE KEY-----
-MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC44/okry1PRZ0i
-8xsrrRPH8Gtu5k3+0mf4dVfCH3F0MDLKAyGkjvJ9fU0XOQC2gFv10IRua8C0iZKW
-r6CsMxDyqx78ojRbS+JAtshfBR0hpLH+opiNSmtiAHCUw3zChX30gH5LBntPlIcx
-vUsrrEz3Jtp6I3E4+h4bLhLpi8SkLW2O0oqrySkGVo3emzHkfaN5H/8mP+HhX/u2
-vNY7kSYuBwL2PHg5rOsBHzmM4qAuj0vQqYp7pLiJxDwi3ss3XsFyKpQoythBLSSP
-pH4e2gjd/v3A0Et1OdrcNiwXdgMsGuU9XwYHQ9JNROo1Khfjb+qVlW4fzDPxMalC
-KOxFz+/fAgMBAAECggEAHYDzt8rkdhPrwVn96fhSgcNRwX6qz5EP2kwPVwDhf+L5
-F9dsFPBirbfDB4OnI3hUNGOz3lL/i0+wvq8D+raja7X22eWgaTkwv5brXo5YWbgI
-V1Pm+BT6Ecd0L6kKTZgzw0KF5L8CCm7vK/bC+hMirQXcM0VYmfj/uOKfTflpxbDc
-OPtzT99lVhjJg2e7GTnwpIXERI8SByjc+L1pQrN4FsoOl4VTg8o+QeLcKHghFaZ1
-jnQb9B2EQ1TrsGnww1tNrNOvV9k/UBXCH+A3s6OCaHfNLoREATMqrtX11a2qzMZz
-7VZtWC7uqI/FjZZEDluXYlJHqe9VY4c7cVqMIuNSMQKBgQDz72qDrdufi5z61h89
-vWg0giIC6gkyy6OhwDYbv4ydI/9m3vexGbkX33YLmSxxKmgiYT6UD+LvjiHw6Waa
-0iFX7L0FF1KgPRxhfs1g37YPWD1e/2tpT17VKLqjMAX4xOwZ3HfVvZBI/0g6hjzZ
-sBB3Vtq0iyU+yXFZ5u2pgtqp7QKBgQDCCPec900fNF6e08Z0fxWVYqPiOw4I3iWb
-emi3pGPWMLPoOwKDPfguSaHJKhi/Gq9Ipd30T2xkvuW7jMFzMOcGhoVMmFVuLfJz
-ttj8J5x1YtgmNrXYwtWXQJypqmZJTYwXOBzUYRiplIZNvA1FIy0tSVyH1Zg85/43
-vpElJ+wXewKBgHAOuaWIBm4CWri4CF36VpZYeXtRO6yD88VoYPLaSaQeV0NQhgRr
-RqX612V4lfveeTvh5DdsHNnjNyBOd/4DLaIQdLyT/Db0G8eF0p7/5ciixn6PYy5b
-cbsGHMa+Vt/yxmsS5lHf5RpDe1C3PdjakpXf5lQt34w6ScH83YyTOhP5AoGBAK5C
-s28LQv4lYF0wQOlbQR0aq6h/9QjNyeSquOVFBEzXDJwicw0/WGbpxh0Oa48l/go2
-vPGvat/H+jbIIOy9HJ7lrU2u+fqr1TVLH/DF+mQKU6luNT7pLD5cztYprRdkR86K
-nIm4chfKxhuGKjzPbMFhQ3LSx5jbmZqi0WQXSJeFAoGARorE8VlMqDbgtSP/TApp
-HAr/UuVdmf8Ag+ZUpa2o33E39L9yLnj7L60GZKVJ87weYj/CHatiCIzpStNsGkoU
-81iOD/cUhLl7K9B0WeT7ECfO4Vk6xg6n0SH6YykEyudAmlrtVfxZ1EclQ2OKhxfN
-Ia8OCVyYe7VFKVYFkh4PBhQ=
------END PRIVATE KEY-----`
-	str := keqing.RsaEncryptCustom(publicKey, "剑光如我,斩尽牛杂")
-	fmt.Println(str)
-	fmt.Println("-------------------")
-	data := keqing.RsaDecryptCustom(privateKey, str)
-	fmt.Println(data)
+	publicKey, privateKey := rsaDemoKeys(t)
+	plaintext := "剑光如我,斩尽牛杂"
+	ciphertext := keqing.RsaEncryptCustom(publicKey, plaintext)
+	if ciphertext == "" {
+		t.Fatal("custom-key OAEP encryption returned empty ciphertext")
+	}
+	assertDemoEqual(t, keqing.RsaDecryptCustom(privateKey, ciphertext), plaintext)
 }
 
 func demo14() {

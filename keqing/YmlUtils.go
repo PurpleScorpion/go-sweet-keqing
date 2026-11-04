@@ -2,6 +2,9 @@ package keqing
 
 import (
 	"errors"
+	"fmt"
+	"math"
+	"strconv"
 	"strings"
 )
 
@@ -27,41 +30,25 @@ func ValueObject(key string) interface{} {
 }
 
 func ValueInt(key string) int {
-	val := getYamlValue(key)
-	if val == nil {
-		return 0
-	}
-
-	switch v := val.(type) {
-	case float64:
-		return int(v)
-	case float32:
-		return int(v)
-	case int:
-		return v
-	case int8:
-		return int(v)
-	case int16:
-		return int(v)
-	case int32:
-		return int(v)
-	case int64:
-		return int(v)
-	}
-
-	return val.(int)
+	return int(yamlIntegerValue(key, strconv.IntSize))
 }
 
 func ValueInt64(key string) int64 {
-	return int64(ValueInt(key))
+	return int64(yamlIntegerValue(key, 64))
 }
 
 func ValueInt32(key string) int32 {
-	return int32(ValueInt(key))
+	return int32(yamlIntegerValue(key, 32))
 }
 
 func ValueFloat32(key string) float32 {
-	return float32(ValueFloat64(key))
+	value := ValueFloat64(key)
+	result := float32(value)
+	// Preserve explicit infinities and NaN, but reject finite conversion overflow.
+	if math.IsInf(float64(result), 0) && !math.IsInf(value, 0) {
+		panic(fmt.Sprintf("YAML value %s is outside float32 range", key))
+	}
+	return result
 }
 
 func ValueFloat64(key string) float64 {
@@ -137,30 +124,68 @@ func getYamlValue(key string) interface{} {
 	if !(strings.HasPrefix(key, "${") && strings.HasSuffix(key, "}")) {
 		panic("key must start with ${ and end with }")
 	}
-	key = key[2 : len(key)-1]
-	arr := strings.Split(key, ".")
-	val := applicationYml[arr[0]]
-	val2 := applicationChildYml[arr[0]]
-	if len(arr) == 1 {
-		if val2 == nil {
-			return val
-		}
-		return val2
+	path := strings.Split(key[2:len(key)-1], ".")
+	// Child non-nil values win, including false, zero, and empty strings.
+	// Missing paths and explicit YAML null preserve the existing parent fallback.
+	if value := lookupYamlPath(applicationChildYml, path); value != nil {
+		return value
 	}
+	return lookupYamlPath(applicationYml, path)
+}
 
-	for i := 1; i < len(arr); i++ {
-		tmp := arr[i]
-		if val != nil {
-			v := val.(map[string]interface{})
-			val = v[tmp]
+func lookupYamlPath(config map[string]interface{}, path []string) interface{} {
+	var value interface{} = config
+	for _, part := range path {
+		mapping, ok := value.(map[string]interface{})
+		if !ok {
+			return nil
 		}
-		if val2 != nil {
-			v := val2.(map[string]interface{})
-			val2 = v[tmp]
+		value = mapping[part]
+	}
+	return value
+}
+
+// yamlIntegerValue preserves integer width and rejects conversion overflow.
+// Finite fractional values keep the existing truncation-toward-zero behavior.
+func yamlIntegerValue(key string, bits int) int64 {
+	value := getYamlValue(key)
+	if value == nil {
+		return 0
+	}
+	var integer int64
+	var floating float64
+	isFloat := false
+	switch v := value.(type) {
+	case int:
+		integer = int64(v)
+	case int8:
+		integer = int64(v)
+	case int16:
+		integer = int64(v)
+	case int32:
+		integer = int64(v)
+	case int64:
+		integer = v
+	case float32:
+		floating, isFloat = float64(v), true
+	case float64:
+		floating, isFloat = v, true
+	default:
+		panic(fmt.Sprintf("YAML value %s of type %T cannot be converted to integer", key, value))
+	}
+	if isFloat {
+		floating = math.Trunc(floating)
+		limit := math.Ldexp(1, bits-1)
+		if math.IsNaN(floating) || math.IsInf(floating, 0) || floating < -limit || floating >= limit {
+			panic(fmt.Sprintf("YAML value %s is outside int%d range", key, bits))
+		}
+		return int64(floating)
+	}
+	if bits < 64 {
+		limit := int64(1) << (bits - 1)
+		if integer < -limit || integer >= limit {
+			panic(fmt.Sprintf("YAML value %s is outside int%d range", key, bits))
 		}
 	}
-	if val2 == nil {
-		return val
-	}
-	return val2
+	return integer
 }

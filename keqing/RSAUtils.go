@@ -9,18 +9,35 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"path/filepath"
+	"sync"
 )
 
+type rsaKeyPair struct {
+	public  *rsa.PublicKey
+	private *rsa.PrivateKey
+}
+
 var (
-	publicKeyBlock      *rsa.PublicKey  = nil
-	privateKeyBlock     *rsa.PrivateKey = nil
-	RSA_KEY_FILE_TYPE                   = "FILE"
-	RSA_KEY_STRING_TYPE                 = "STRING"
-	RSA_PKCS1                           = "PKCS1"
-	RSA_PKCS8_SHA_256                   = "sha256"
+	rsaKeyMu            sync.RWMutex
+	rsaKeys             rsaKeyPair
+	RSA_KEY_FILE_TYPE   = "FILE"
+	RSA_KEY_STRING_TYPE = "STRING"
+	RSA_PKCS1           = "PKCS1"
+	RSA_PKCS8_SHA_256   = "sha256"
 )
+
+// Return one immutable pair snapshot; parsing and cryptographic operations run
+// outside the lock. Keys published here are never changed in place.
+func loadedRSAKeyPair() rsaKeyPair {
+	rsaKeyMu.RLock()
+	pair := rsaKeys
+	rsaKeyMu.RUnlock()
+	return pair
+}
 
 /*
 加载密钥对
@@ -49,58 +66,156 @@ func RsaLoadKey(publicKey string, privateKey string, keyType string) error {
 		if err != nil {
 			return err
 		}
-		privateKeyBlock = RsaLoadPrivateKey(string(privateKeyPEM))
-		publicKeyBlock = RsaLoadPublicKey(string(publicKeyPEM))
-		return nil
-	} else if keyType == RSA_KEY_STRING_TYPE {
-		privateKeyBlock = RsaLoadPrivateKey(privateKey)
-		publicKeyBlock = RsaLoadPublicKey(publicKey)
-		return nil
+		publicKey, privateKey = string(publicKeyPEM), string(privateKeyPEM)
+	} else if keyType != RSA_KEY_STRING_TYPE {
+		return errors.New("KeyType type error")
 	}
-	return errors.New("KeyType type error")
+	// Keep both parsed keys local until all validation succeeds. In particular,
+	// a legacy PEM parsing panic must not change the currently loaded pair.
+	private := RsaLoadPrivateKey(privateKey)
+	public := RsaLoadPublicKey(publicKey)
+	if !public.Equal(&private.PublicKey) {
+		return errors.New("RSA public and private keys do not match")
+	}
+	rsaKeyMu.Lock()
+	rsaKeys = rsaKeyPair{public: public, private: private}
+	rsaKeyMu.Unlock()
+	return nil
 }
 
 /*
  * 生成RSA密钥到指定目录下
  */
 func RsaGenerateKey(path string) string {
-	// 生成RSA密钥对
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	result, err := RsaGenerateKeyWithError(path)
 	if err != nil {
 		panic(err)
 	}
-	// 将私钥编码为PKCS#8格式
-	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
-	if err != nil {
-		panic(err)
-	}
-	privateKeyPEM := &pem.Block{
-		Type:  "PRIVATE KEY",
-		Bytes: privateKeyBytes,
-	}
-	// 提取公钥
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		panic(err)
-	}
-	publicKeyPEM := &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: publicKeyBytes,
-	}
-
-	MkdirAll(path)
-	err = writeToFile(path+"/publicKey.pem", publicKeyPEM)
-	err = writeToFile(path+"/privateKey.pem", privateKeyPEM)
-	return path
+	return result
 }
 
-func writeToFile(filePath string, pemBlock *pem.Block) error {
-	file, err := os.Create(filePath)
+// RsaGenerateKeyWithError creates a new key pair without overwriting either key file.
+// On failure it returns an empty path and removes only files created by this call.
+// Private keys use mode 0600 on Unix; Windows permissions follow the parent ACL.
+func RsaGenerateKeyWithError(path string) (string, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("generate RSA key: %w", err)
 	}
-	defer file.Close()
-	return pem.Encode(file, pemBlock)
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return "", fmt.Errorf("encode RSA private key: %w", err)
+	}
+	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	})
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return "", fmt.Errorf("encode RSA public key: %w", err)
+	}
+	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: publicKeyBytes,
+	})
+	if err := os.MkdirAll(path, 0700); err != nil {
+		return "", fmt.Errorf("create RSA key directory: %w", err)
+	}
+	if err := createRSAKeyFiles(path, privateKeyPEM, publicKeyPEM, openRSAKeyFile); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+type rsaKeyFile interface {
+	io.Writer
+	Sync() error
+	Close() error
+	Stat() (os.FileInfo, error)
+	Chmod(os.FileMode) error
+}
+
+func openRSAKeyFile(path string, flag int, mode os.FileMode) (rsaKeyFile, error) {
+	return os.OpenFile(path, flag, mode)
+}
+
+// Opening both files exclusively before writing also prevents concurrent calls
+// from replacing an existing pair. Cleanup never includes a failed open.
+func createRSAKeyFiles(path string, privatePEM, publicPEM []byte, openFile func(string, int, os.FileMode) (rsaKeyFile, error)) (err error) {
+	outputs := []struct {
+		path string
+		data []byte
+		mode os.FileMode
+		file rsaKeyFile
+		info os.FileInfo
+	}{
+		{path: filepath.Join(path, "privateKey.pem"), data: privatePEM, mode: 0600},
+		{path: filepath.Join(path, "publicKey.pem"), data: publicPEM, mode: 0644},
+	}
+	defer func() {
+		// Close every handle before cleanup, including on Windows.
+		for _, output := range outputs {
+			if output.file != nil {
+				if closeErr := output.file.Close(); closeErr != nil {
+					err = errors.Join(err, fmt.Errorf("close RSA key %q: %w", output.path, closeErr))
+				}
+			}
+		}
+		if err == nil {
+			return
+		}
+		for _, output := range outputs {
+			if output.file == nil {
+				continue
+			}
+			current, statErr := os.Lstat(output.path)
+			if os.IsNotExist(statErr) {
+				continue
+			}
+			if statErr != nil {
+				err = errors.Join(err, fmt.Errorf("inspect RSA key for cleanup %q: %w", output.path, statErr))
+				continue
+			}
+			// Do not remove a replacement installed by another actor.
+			if output.info == nil || !os.SameFile(output.info, current) {
+				err = errors.Join(err, fmt.Errorf("RSA key %q changed during cleanup; left untouched", output.path))
+				continue
+			}
+			if removeErr := os.Remove(output.path); removeErr != nil {
+				err = errors.Join(err, fmt.Errorf("remove incomplete RSA key %q: %w", output.path, removeErr))
+			}
+		}
+	}()
+	for i := range outputs {
+		output := &outputs[i]
+		file, openErr := openFile(output.path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, output.mode)
+		if openErr != nil {
+			return fmt.Errorf("create RSA key %q: %w", output.path, openErr)
+		}
+		output.file = file
+		output.info, err = file.Stat()
+		if err != nil {
+			return fmt.Errorf("inspect new RSA key %q: %w", output.path, err)
+		}
+		if output.mode == 0600 {
+			if err := file.Chmod(0600); err != nil {
+				return fmt.Errorf("set RSA private key permissions: %w", err)
+			}
+		}
+	}
+	for _, output := range outputs {
+		n, writeErr := output.file.Write(output.data)
+		if writeErr == nil && n != len(output.data) {
+			writeErr = io.ErrShortWrite
+		}
+		if writeErr != nil {
+			return fmt.Errorf("write RSA key %q: %w", output.path, writeErr)
+		}
+		if syncErr := output.file.Sync(); syncErr != nil {
+			return fmt.Errorf("sync RSA key %q: %w", output.path, syncErr)
+		}
+	}
+	return nil
 }
 
 func RsaLoadPrivateKey(privateKeyPEM string) *rsa.PrivateKey {
@@ -164,13 +279,14 @@ func RsaEncrypt4PKCS1(publicKey *rsa.PublicKey, data string) string {
 加密文本
 */
 func RsaEncrypt(data string) string {
-	if publicKeyBlock == nil {
+	publicKey := loadedRSAKeyPair().public
+	if publicKey == nil {
 		panic("请先加载公钥")
 	}
 	if IsEmpty(data) {
 		panic("The data to be encrypted cannot be empty")
 	}
-	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, publicKeyBlock, GetBytes(data), nil)
+	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, publicKey, GetBytes(data), nil)
 	if err != nil {
 		fmt.Println("Encryption failed:", err)
 		return ""
@@ -239,7 +355,8 @@ func RsaDecrypt4PKCS1(key *rsa.PrivateKey, ciphertextString string) string {
 解密文本
 */
 func RsaDecrypt(ciphertextString string) string {
-	if privateKeyBlock == nil {
+	privateKey := loadedRSAKeyPair().private
+	if privateKey == nil {
 		panic("Please load the private key first")
 	}
 	if IsEmpty(ciphertextString) {
@@ -250,7 +367,7 @@ func RsaDecrypt(ciphertextString string) string {
 		log.Println("Password parsing failed:", err)
 		return ""
 	}
-	decryptedText, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKeyBlock, data, nil)
+	decryptedText, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, data, nil)
 	if err != nil {
 		fmt.Println("Decryption failed:", err)
 		return ""

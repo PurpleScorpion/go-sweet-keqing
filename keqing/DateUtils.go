@@ -99,34 +99,49 @@ func ParseDate(dateStr string, format string, location *time.Location) time.Time
 }
 
 func DateAddSecond(date time.Time, seconds int64) time.Time {
-	return date.Add(time.Duration(seconds) * time.Second)
+	return date.Add(checkedDateDuration(seconds, time.Second))
 }
 
 func DateAddMinute(date time.Time, minute int64) time.Time {
-	return date.Add(time.Duration(minute) * time.Minute)
+	return date.Add(checkedDateDuration(minute, time.Minute))
 }
 
 func DateAddHour(date time.Time, hour int64) time.Time {
-	return date.Add(time.Duration(hour) * time.Hour)
+	return date.Add(checkedDateDuration(hour, time.Hour))
 }
 
+// DateAddDay 按日期所在时区增加日历日；不可表示的偏移会 panic。
 func DateAddDay(date time.Time, day int64) time.Time {
-	return date.Add(time.Duration(day) * time.Hour * 24)
+	// AddDate accepts an int day offset. Check conversion and its day-of-month addition.
+	const maxDayOffset = int64(^uint64(0)>>1) / (24 * 60 * 60)
+	maxInt := int64(int(^uint(0) >> 1))
+	if day < -maxDayOffset || day > maxDayOffset || int64(int(day)) != day || day > maxInt-int64(date.Day()) {
+		panic("day offset is outside the supported calendar range")
+	}
+	result := date.AddDate(0, 0, int(day))
+	if (day > 0 && result.Before(date)) || (day < 0 && result.After(date)) {
+		panic("calendar date overflow")
+	}
+	return result
 }
 
 func DateSubSecond(date time.Time, seconds int64) time.Time {
-	return DateAddSecond(date, seconds*-1)
+	return date.Add(-checkedDateDuration(seconds, time.Second))
 }
 func DateSubMinute(date time.Time, minute int64) time.Time {
-	return DateAddMinute(date, minute*-1)
+	return date.Add(-checkedDateDuration(minute, time.Minute))
 }
 
 func DateSubHour(date time.Time, hour int64) time.Time {
-	return DateAddHour(date, hour*-1)
+	return date.Add(-checkedDateDuration(hour, time.Hour))
 }
 
 func DateSubDay(date time.Time, day int64) time.Time {
-	return DateAddDay(date, day*-1)
+	const minInt64 = -int64(^uint64(0)>>1) - 1
+	if day == minInt64 {
+		panic("day offset is outside the supported calendar range")
+	}
+	return DateAddDay(date, -day)
 }
 
 func ParseUTC(utc string) time.Time {
@@ -149,19 +164,24 @@ func GetDaysInMonth(data any, years ...int) int {
 	if err != nil {
 		panic(err)
 	}
-	if year == 0 {
-		if years == nil || len(years) == 0 {
-			panic("please provide the year")
-		}
+	if len(years) > 0 {
 		year = years[0]
+	} else if _, fromTime := data.(time.Time); !fromTime {
+		panic("please provide the year")
 	}
 
-	// 获取下个月的第一天
-	firstDayOfNextMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Local)
-	// 获取当前月的最后一天
-	lastDayOfMonth := firstDayOfNextMonth.AddDate(0, 0, -1)
-	// 获取最后一天的日期，即该月的天数
-	return lastDayOfMonth.Day()
+	// Gregorian month lengths do not depend on the machine's time zone.
+	switch month {
+	case time.February:
+		if year%400 == 0 || year%4 == 0 && year%100 != 0 {
+			return 29
+		}
+		return 28
+	case time.April, time.June, time.September, time.November:
+		return 30
+	default:
+		return 31
+	}
 }
 func getMonthFromData(data any) (int, time.Month, error) {
 	var month int
@@ -173,9 +193,12 @@ func getMonthFromData(data any) (int, time.Month, error) {
 	case int32:
 		month = int(t)
 	case int64:
+		if t < 1 || t > 12 {
+			return 0, 0, fmt.Errorf("month must be between 1 and 12: %d", t)
+		}
 		month = int(t)
 	case time.Month:
-		return 0, t, nil
+		month = int(t)
 	case time.Time:
 		return t.Year(), t.Month(), nil
 	default:
@@ -229,17 +252,18 @@ func CurrentTimeSeconds() int64 {
 }
 
 /*
-获取昨天的开始和结束时间
+获取昨天的开始和结束时间（闭区间，结束时间为当天最后一纳秒）
 */
 func GetStartAndEnd4Yesterday() (time.Time, time.Time) {
-	now := time.Now()
-	// 减去24小时得到昨天同一时间
-	yesterdaySameTime := now.Add(-24 * time.Hour)
-	// 设置时间为昨天0点
-	yesterdayStart := time.Date(yesterdaySameTime.Year(), yesterdaySameTime.Month(), yesterdaySameTime.Day(), 0, 0, 0, 0, time.Local)
-	// 计算昨天24点的时间
-	yesterdayEnd := yesterdayStart.Add(24 * time.Hour)
-	return yesterdayStart, yesterdayEnd
+	return startAndEnd4Yesterday(time.Now())
+}
+
+func startAndEnd4Yesterday(now time.Time) (time.Time, time.Time) {
+	today := calendarDate(now)
+	todayStart := calendarDateStart(today, now.Location())
+	yesterdayStart := calendarDateStart(today.AddDate(0, 0, -1), now.Location())
+	// A wholly skipped civil date has no instants: end is one nanosecond before start.
+	return yesterdayStart, todayStart.Add(-time.Nanosecond)
 }
 
 /*
@@ -251,17 +275,17 @@ func GetStartAndEndUTC4Yesterday() (time.Time, time.Time) {
 }
 
 /*
-获取今天的开始和结束时间
+获取今天的开始和结束时间（闭区间，结束时间为当天最后一纳秒）
 */
 func GetStartAndEnd4Today() (time.Time, time.Time) {
-	now := time.Now()
-	// 设置时间为昨天0点
-	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
-	// 获取明天的开始时间
-	nextDay := start.AddDate(0, 0, 1)
-	// 获取今天的结束时间
-	end := nextDay.Add(-time.Nanosecond)
-	return start, end
+	return startAndEnd4Today(time.Now())
+}
+
+func startAndEnd4Today(now time.Time) (time.Time, time.Time) {
+	today := calendarDate(now)
+	start := calendarDateStart(today, now.Location())
+	next := calendarDateStart(today.AddDate(0, 0, 1), now.Location())
+	return start, next.Add(-time.Nanosecond)
 }
 
 /*
@@ -273,21 +297,67 @@ func GetStartAndEndUTC4Today() (time.Time, time.Time) {
 }
 
 /*
-获取本月的开始和结束时间
+获取本月的开始和结束时间（闭区间，结束时间为当月最后一纳秒）
 */
 func GetStartAndEnd4CurrentMonth() (time.Time, time.Time) {
-	// 获取当前时间
-	now := time.Now()
+	return startAndEnd4CurrentMonth(time.Now())
+}
 
-	// 获取本月的开始时间
-	firstDayOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
+func startAndEnd4CurrentMonth(now time.Time) (time.Time, time.Time) {
+	month := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	start := calendarDateStart(month, now.Location())
+	next := calendarDateStart(month.AddDate(0, 1, 0), now.Location())
+	return start, next.Add(-time.Nanosecond)
+}
 
-	// 获取下个月的开始时间
-	firstDayOfNextMonth := firstDayOfMonth.AddDate(0, 1, 0)
+// calendarDate represents a civil date in UTC for calendar arithmetic only.
+// Arithmetic on an already normalized local midnight can change the intended date.
+func calendarDate(date time.Time) time.Time {
+	return time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+}
 
-	// 获取本月的结束时间
-	lastDayOfMonth := firstDayOfNextMonth.Add(-time.Nanosecond)
-	return firstDayOfMonth, lastDayOfMonth
+// calendarDateStart returns the first valid instant at or after a local civil
+// date's midnight. It chooses the first occurrence of a repeated midnight and
+// advances past a missing midnight (or a wholly skipped date).
+func calendarDateStart(date time.Time, loc *time.Location) time.Time {
+	cursor := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, loc)
+	// time.Date may choose the second occurrence of an ambiguous midnight.
+	// Walk earlier zone intervals while they still reach the requested civil date.
+	for {
+		start, _ := cursor.ZoneBounds()
+		if start.IsZero() {
+			break
+		}
+		previous := start.Add(-time.Nanosecond)
+		if calendarDate(previous).Before(date) {
+			break
+		}
+		cursor = previous
+	}
+	for {
+		start, end := cursor.ZoneBounds()
+		_, offset := cursor.Zone()
+		// A fixed offset has no missing/ambiguous clock times. Avoid converting
+		// offsets to time.Duration, which would unnecessarily limit large fixed zones.
+		candidate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.FixedZone("", offset))
+		if !start.IsZero() && candidate.Before(start) {
+			candidate = start
+		}
+		actual := candidate.In(loc)
+		_, actualOffset := actual.Zone()
+		if actualOffset == offset {
+			// Verify the candidate against the actual zone rather than relying on
+			// ZoneBounds' synthetic POSIX year-end boundary (which may be stale
+			// on the last day of a future leap year).
+			return actual
+		}
+		if end.IsZero() || !end.After(cursor) {
+			panic("time zone boundary does not advance")
+		}
+		// The requested midnight is beyond this interval. Crossing the transition
+		// finds the first valid instant when a forward jump skipped midnight.
+		cursor = end
+	}
 }
 
 /*
@@ -296,4 +366,15 @@ func GetStartAndEnd4CurrentMonth() (time.Time, time.Time) {
 func GetStartAndEndUTC4CurrentMonth() (time.Time, time.Time) {
 	start, now := GetStartAndEnd4CurrentMonth()
 	return start.UTC(), now.UTC()
+}
+
+// checkedDateDuration rejects multiplication overflow before converting a unit count.
+func checkedDateDuration(amount int64, unit time.Duration) time.Duration {
+	const maxInt64 = int64(^uint64(0) >> 1)
+	const minInt64 = -maxInt64 - 1
+	scale := int64(unit)
+	if amount > maxInt64/scale || amount < minInt64/scale {
+		panic("time duration overflow")
+	}
+	return time.Duration(amount * scale)
 }

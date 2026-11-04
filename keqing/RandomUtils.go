@@ -11,7 +11,7 @@ import (
 
 var (
 	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-	mu  sync.RWMutex
+	mu  sync.Mutex
 )
 
 // WinningRate 随机概率
@@ -40,25 +40,46 @@ func WinningRate(num float64) bool {
 	return n < threshold
 }
 
-// RandomId 根据雪花算法生成id
+// ConfigureRandomID 在首次生成 ID 前配置 workerID（0..1023）。
+// 多进程/多主机必须由部署方分配不同 workerID；默认 MAC 哈希只适用于单进程。
+func ConfigureRandomID(workerID int64) error {
+	sfMu.Lock()
+	defer sfMu.Unlock()
+	if workerID < 0 || workerID > maxWorkerId {
+		return errWorkerIDInvalid
+	}
+	if sfStarted {
+		return errors.New("RandomId has already started; workerID cannot be changed")
+	}
+	sf = &snowflake{workerId: workerID, lastTimestamp: -1}
+	return nil
+}
+
+// RandomId 根据雪花算法生成 ID；初始化失败或时钟回拨时 panic。
+// 需要恢复错误的调用方可以使用 RandomIdWithError。
 func RandomId() int64 {
+	id, err := RandomIdWithError()
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
+// RandomIdWithError 与 RandomId 使用同一生成器，但将失败返回给调用方。
+func RandomIdWithError() (int64, error) {
+	sfMu.Lock()
 	if sf == nil {
-		tmp, err := newSnowflake()
-		if err == nil {
-			sf = tmp
-			id, err2 := sf.nextID()
-			if err2 == nil {
-				return id
-			}
-			return 0
+		instance, err := newSnowflake()
+		if err != nil {
+			sfMu.Unlock()
+			return 0, err
 		}
-		return 0
+		sf = instance
 	}
-	id, err2 := sf.nextID()
-	if err2 == nil {
-		return id
-	}
-	return 0
+	sfStarted = true
+	instance := sf
+	sfMu.Unlock()
+	return instance.nextID()
 }
 
 const (
@@ -76,6 +97,8 @@ var (
 	errSequenceOverflow            = errors.New("序列号超过最大值")
 	errWorkerIDInvalid             = errors.New("无效的机器ID")
 	sf                  *snowflake = nil
+	sfMu                sync.Mutex
+	sfStarted           bool
 )
 
 type snowflake struct {
@@ -83,6 +106,15 @@ type snowflake struct {
 	workerId      int64
 	lastTimestamp int64
 	sequence      int64
+	// Set only when constructing an instance; nil uses the wall clock.
+	nowMillis func() int64
+}
+
+func (s *snowflake) currentMillis() int64 {
+	if s.nowMillis != nil {
+		return s.nowMillis()
+	}
+	return time.Now().UnixNano() / 1e6
 }
 
 // NextID 生成下一个ID
@@ -90,34 +122,44 @@ func (s *snowflake) nextID() (int64, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	timestamp := time.Now().UnixNano() / 1e6 // 毫秒级时间戳
+	timestamp := s.currentMillis()
 
 	if timestamp < s.lastTimestamp {
 		return 0, errTimeBackwards
 	}
 
+	sequence := int64(0)
 	if timestamp == s.lastTimestamp {
-		s.sequence = (s.sequence + 1) & sequenceMask
-		if s.sequence == 0 {
-			timestamp = tilNextMillis(s.lastTimestamp)
+		sequence = (s.sequence + 1) & sequenceMask
+		if sequence == 0 {
+			var err error
+			timestamp, err = s.tilNextMillis(s.lastTimestamp)
+			if err != nil {
+				return 0, err
+			}
 		}
-	} else {
-		s.sequence = 0
 	}
 
+	// Do not reset an exhausted sequence if waiting fails: retrying in the same
+	// millisecond must wait again, rather than reuse already-issued sequence values.
 	s.lastTimestamp = timestamp
+	s.sequence = sequence
 
 	return (timestamp << timestampShift) |
 		(s.workerId << workerShift) |
 		s.sequence, nil
 }
 
-func tilNextMillis(lastTimestamp int64) int64 {
-	timestamp := time.Now().UnixNano() / 1e6
-	for timestamp <= lastTimestamp {
-		timestamp = time.Now().UnixNano() / 1e6
+func (s *snowflake) tilNextMillis(lastTimestamp int64) (int64, error) {
+	for {
+		timestamp := s.currentMillis()
+		if timestamp < lastTimestamp {
+			return 0, errTimeBackwards
+		}
+		if timestamp > lastTimestamp {
+			return timestamp, nil
+		}
 	}
-	return timestamp
 }
 
 func newSnowflake() (*snowflake, error) {
@@ -178,6 +220,8 @@ func RandomNextInt(args ...interface{}) int {
 
 // Random 生成0-1之间的随机数 [0,1)
 func Random() float64 {
+	mu.Lock()
+	defer mu.Unlock()
 	return rng.Float64()
 }
 
@@ -204,6 +248,9 @@ func isInt(v interface{}) (bool, int) {
 	case int32:
 		return true, int(val)
 	case int64:
+		if int64(int(val)) != val {
+			panic("random integer argument is outside int range")
+		}
 		return true, int(val)
 	default:
 		return false, 0
@@ -211,13 +258,28 @@ func isInt(v interface{}) (bool, int) {
 }
 
 func nextInt2(min, max int) int {
-	mu.RLock()
-	defer mu.RUnlock()
-	return rng.Intn(max-min) + min
+	if min >= max {
+		panic("random interval must have min < max")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	// Unsigned subtraction also represents intervals wider than MaxInt.
+	width := uint(max) - uint(min)
+	if width <= uint(^uint(0)>>1) {
+		return rng.Intn(int(width)) + min
+	}
+	// Reject the incomplete modulo bucket to preserve uniform sampling.
+	threshold := -width % width
+	for {
+		n := uint(rng.Uint64())
+		if n >= threshold {
+			return int(uint(min) + n%width)
+		}
+	}
 }
 
 func nextInt1(num int) int {
-	mu.RLock()
-	defer mu.RUnlock()
+	mu.Lock()
+	defer mu.Unlock()
 	return rng.Intn(num)
 }

@@ -92,6 +92,9 @@ func ToJsonString(data any) string {
 将 数组 / 结构体 转换为标准字符串打印
 */
 func ToString(obj interface{}) string {
+	if obj == nil {
+		return "null"
+	}
 	if isSlice(obj) {
 		return array2Str(obj)
 	}
@@ -119,6 +122,8 @@ func map2Str(obj interface{}) string {
 
 		// 对 value 做类型判断并递归处理结构体、slice、map 等
 		switch val := value.(type) {
+		case nil:
+			result = append(result, fmt.Sprintf("%s: null", key))
 		case struct{}:
 			result = append(result, fmt.Sprintf("%s: %v", key, struct2Str(val)))
 		case map[string]interface{}:
@@ -146,6 +151,13 @@ func struct2Str(obj interface{}) string {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		value := v.Field(i)
+		if !value.CanInterface() {
+			continue
+		}
+		if value.Kind() == reflect.Interface && value.IsNil() {
+			result = append(result, fmt.Sprintf("%s: null", field.Name))
+			continue
+		}
 		if field.Type.Kind() == reflect.Struct {
 			result = append(result, fmt.Sprintf("%s: %v", field.Name, struct2Str(value.Interface())))
 		} else if isMap(value.Interface()) {
@@ -173,10 +185,14 @@ func array2Str(obj interface{}) string {
 
 	for _, item := range slice {
 		switch v := item.(type) {
+		case nil:
+			result = append(result, "null")
 		case string:
 			result = append(result, fmt.Sprintf(`"%s"`, v))
-		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		case int, int8, int16, int32, int64:
 			result = append(result, strconv.FormatInt(reflect.ValueOf(v).Int(), 10))
+		case uint, uint8, uint16, uint32, uint64:
+			result = append(result, strconv.FormatUint(reflect.ValueOf(v).Uint(), 10))
 		case bool:
 			result = append(result, strconv.FormatBool(v))
 		default:
@@ -302,7 +318,7 @@ func Snake2BigCamel(s string) string {
 驼峰转下划线
 */
 func Camel2Snake(s string) string {
-	if IsEmpty(s) {
+	if s == "" {
 		return s
 	}
 
@@ -425,37 +441,59 @@ func ParseInt64(str string) int64 {
 	if err != nil {
 		panic(str + " Cannot be converted to int64 type")
 	}
-	return num
+	return int64(num)
 }
 
 func ParseInt32(str string) int32 {
-	return int32(ParseInt64(str))
+	num, err := strconv.ParseInt(str, 10, 32)
+	if err != nil {
+		panic(str + " Cannot be converted to int32 type")
+	}
+	return int32(num)
 }
 
 func ParseInt16(str string) int16 {
-	return int16(ParseInt64(str))
+	num, err := strconv.ParseInt(str, 10, 16)
+	if err != nil {
+		panic(str + " Cannot be converted to int16 type")
+	}
+	return int16(num)
 }
 
 func ParseInt8(str string) int8 {
-	return int8(ParseInt64(str))
+	num, err := strconv.ParseInt(str, 10, 8)
+	if err != nil {
+		panic(str + " Cannot be converted to int8 type")
+	}
+	return int8(num)
 }
 
 func ParseInt(str string) int {
-	return int(ParseInt64(str))
+	num, err := strconv.ParseInt(str, 10, strconv.IntSize)
+	if err != nil {
+		panic(str + " Cannot be converted to int type")
+	}
+	return int(num)
 }
 
 func ParseFloat32(dataStr string) float32 {
-	f, _ := strconv.ParseFloat(dataStr, 32)
+	f, err := strconv.ParseFloat(dataStr, 32)
+	if err != nil {
+		panic(dataStr + " Cannot be converted to float32 type")
+	}
 	return float32(f)
 }
 
 func ParseFloat64(dataStr string) float64 {
-	f, _ := strconv.ParseFloat(dataStr, 64)
-	return f
+	f, err := strconv.ParseFloat(dataStr, 64)
+	if err != nil {
+		panic(dataStr + " Cannot be converted to float64 type")
+	}
+	return float64(f)
 }
 
 func Split(str string, sep string) []string {
-	if IsEmpty(str) {
+	if str == "" {
 		return []string{str}
 	}
 	if !strings.Contains(str, sep) {
