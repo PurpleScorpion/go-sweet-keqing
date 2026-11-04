@@ -40,25 +40,46 @@ func WinningRate(num float64) bool {
 	return n < threshold
 }
 
-// RandomId 根据雪花算法生成id
+// ConfigureRandomID 在首次生成 ID 前配置 workerID（0..1023）。
+// 多进程/多主机必须由部署方分配不同 workerID；默认 MAC 哈希只适用于单进程。
+func ConfigureRandomID(workerID int64) error {
+	sfMu.Lock()
+	defer sfMu.Unlock()
+	if workerID < 0 || workerID > maxWorkerId {
+		return errWorkerIDInvalid
+	}
+	if sfStarted {
+		return errors.New("RandomId has already started; workerID cannot be changed")
+	}
+	sf = &snowflake{workerId: workerID, lastTimestamp: -1}
+	return nil
+}
+
+// RandomId 根据雪花算法生成 ID；初始化失败或时钟回拨时 panic。
+// 需要恢复错误的调用方可以使用 RandomIdWithError。
 func RandomId() int64 {
+	id, err := RandomIdWithError()
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
+// RandomIdWithError 与 RandomId 使用同一生成器，但将失败返回给调用方。
+func RandomIdWithError() (int64, error) {
+	sfMu.Lock()
 	if sf == nil {
-		tmp, err := newSnowflake()
-		if err == nil {
-			sf = tmp
-			id, err2 := sf.nextID()
-			if err2 == nil {
-				return id
-			}
-			return 0
+		instance, err := newSnowflake()
+		if err != nil {
+			sfMu.Unlock()
+			return 0, err
 		}
-		return 0
+		sf = instance
 	}
-	id, err2 := sf.nextID()
-	if err2 == nil {
-		return id
-	}
-	return 0
+	sfStarted = true
+	instance := sf
+	sfMu.Unlock()
+	return instance.nextID()
 }
 
 const (
@@ -76,6 +97,8 @@ var (
 	errSequenceOverflow            = errors.New("序列号超过最大值")
 	errWorkerIDInvalid             = errors.New("无效的机器ID")
 	sf                  *snowflake = nil
+	sfMu                sync.Mutex
+	sfStarted           bool
 )
 
 type snowflake struct {
