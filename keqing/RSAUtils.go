@@ -13,16 +13,31 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
+type rsaKeyPair struct {
+	public  *rsa.PublicKey
+	private *rsa.PrivateKey
+}
+
 var (
-	publicKeyBlock      *rsa.PublicKey  = nil
-	privateKeyBlock     *rsa.PrivateKey = nil
-	RSA_KEY_FILE_TYPE                   = "FILE"
-	RSA_KEY_STRING_TYPE                 = "STRING"
-	RSA_PKCS1                           = "PKCS1"
-	RSA_PKCS8_SHA_256                   = "sha256"
+	rsaKeyMu            sync.RWMutex
+	rsaKeys             rsaKeyPair
+	RSA_KEY_FILE_TYPE   = "FILE"
+	RSA_KEY_STRING_TYPE = "STRING"
+	RSA_PKCS1           = "PKCS1"
+	RSA_PKCS8_SHA_256   = "sha256"
 )
+
+// Return one immutable pair snapshot; parsing and cryptographic operations run
+// outside the lock. Keys published here are never changed in place.
+func loadedRSAKeyPair() rsaKeyPair {
+	rsaKeyMu.RLock()
+	pair := rsaKeys
+	rsaKeyMu.RUnlock()
+	return pair
+}
 
 /*
 加载密钥对
@@ -51,15 +66,21 @@ func RsaLoadKey(publicKey string, privateKey string, keyType string) error {
 		if err != nil {
 			return err
 		}
-		privateKeyBlock = RsaLoadPrivateKey(string(privateKeyPEM))
-		publicKeyBlock = RsaLoadPublicKey(string(publicKeyPEM))
-		return nil
-	} else if keyType == RSA_KEY_STRING_TYPE {
-		privateKeyBlock = RsaLoadPrivateKey(privateKey)
-		publicKeyBlock = RsaLoadPublicKey(publicKey)
-		return nil
+		publicKey, privateKey = string(publicKeyPEM), string(privateKeyPEM)
+	} else if keyType != RSA_KEY_STRING_TYPE {
+		return errors.New("KeyType type error")
 	}
-	return errors.New("KeyType type error")
+	// Keep both parsed keys local until all validation succeeds. In particular,
+	// a legacy PEM parsing panic must not change the currently loaded pair.
+	private := RsaLoadPrivateKey(privateKey)
+	public := RsaLoadPublicKey(publicKey)
+	if !public.Equal(&private.PublicKey) {
+		return errors.New("RSA public and private keys do not match")
+	}
+	rsaKeyMu.Lock()
+	rsaKeys = rsaKeyPair{public: public, private: private}
+	rsaKeyMu.Unlock()
+	return nil
 }
 
 /*
@@ -258,13 +279,14 @@ func RsaEncrypt4PKCS1(publicKey *rsa.PublicKey, data string) string {
 加密文本
 */
 func RsaEncrypt(data string) string {
-	if publicKeyBlock == nil {
+	publicKey := loadedRSAKeyPair().public
+	if publicKey == nil {
 		panic("请先加载公钥")
 	}
 	if IsEmpty(data) {
 		panic("The data to be encrypted cannot be empty")
 	}
-	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, publicKeyBlock, GetBytes(data), nil)
+	ciphertext, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, publicKey, GetBytes(data), nil)
 	if err != nil {
 		fmt.Println("Encryption failed:", err)
 		return ""
@@ -333,7 +355,8 @@ func RsaDecrypt4PKCS1(key *rsa.PrivateKey, ciphertextString string) string {
 解密文本
 */
 func RsaDecrypt(ciphertextString string) string {
-	if privateKeyBlock == nil {
+	privateKey := loadedRSAKeyPair().private
+	if privateKey == nil {
 		panic("Please load the private key first")
 	}
 	if IsEmpty(ciphertextString) {
@@ -344,7 +367,7 @@ func RsaDecrypt(ciphertextString string) string {
 		log.Println("Password parsing failed:", err)
 		return ""
 	}
-	decryptedText, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKeyBlock, data, nil)
+	decryptedText, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privateKey, data, nil)
 	if err != nil {
 		fmt.Println("Decryption failed:", err)
 		return ""
