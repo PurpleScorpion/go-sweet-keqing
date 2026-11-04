@@ -293,12 +293,11 @@ func (l *List[T]) RetainAll(items ...T) {
 
 // Filter 返回一个满足条件的新 List，不会修改原集合
 func (l *List[T]) Filter(predicate func(T) bool) *List[T] {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
+	snapshot := l.GetData()
 
 	filtered := NewList[T](l.hashFunc)
 
-	for _, item := range l.data {
+	for _, item := range snapshot {
 		if predicate(item) {
 			filtered.Add(item)
 		}
@@ -440,12 +439,11 @@ func (l *List[T]) sortBasic(asc bool) {
 }
 
 func (l *List[T]) DeepCopy(cloneFunc func(T) T) *List[T] {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
+	snapshot := l.GetData()
 
 	copyList := NewList[T](l.hashFunc)
 
-	for _, item := range l.data {
+	for _, item := range snapshot {
 		copyList.Add(cloneFunc(item))
 	}
 

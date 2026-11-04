@@ -95,12 +95,11 @@ func List2Map[T comparable, K comparable](
 	keyFunc func(T) K,
 	onConflict int,
 ) map[K]T {
-	list.mu.RLock()
-	defer list.mu.RUnlock()
+	snapshot := list.GetData()
 
-	result := make(map[K]T, len(list.data))
+	result := make(map[K]T, len(snapshot))
 
-	for _, item := range list.data {
+	for _, item := range snapshot {
 		key := keyFunc(item)
 		_, exists := result[key]
 
@@ -131,12 +130,11 @@ func Set2Map[T comparable, K comparable](
 	keyFunc func(T) K,
 	onConflict int,
 ) map[K]T {
-	set.mu.RLock()
-	defer set.mu.RUnlock()
+	snapshot := set.GetData()
 
 	result := make(map[K]T)
 
-	for _, item := range set.data {
+	for _, item := range snapshot {
 		key := keyFunc(item)
 		_, exists := result[key]
 

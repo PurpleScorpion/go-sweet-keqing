@@ -229,12 +229,11 @@ func (s *Set[T]) RetainAll(items ...T) {
 
 // Filter 返回一个满足条件的新 Set，不会修改原集合
 func (s *Set[T]) Filter(predicate func(T) bool) *Set[T] {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	snapshot := s.GetData()
 
 	newSet := NewSet[T](s.hashFunc)
 
-	for _, item := range s.data {
+	for _, item := range snapshot {
 		if predicate(item) {
 			newSet.Add(item)
 		}
@@ -259,12 +258,11 @@ func (s *Set[T]) Copy() *Set[T] {
 
 // DeepCopy 返回一个新的 Set，使用 cloneFunc 对每个元素进行深拷贝
 func (s *Set[T]) DeepCopy(cloneFunc func(T) T) *Set[T] {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	snapshot := s.GetData()
 
 	copySet := NewSet[T](s.hashFunc)
 
-	for _, item := range s.data {
+	for _, item := range snapshot {
 		copySet.Add(cloneFunc(item))
 	}
 
