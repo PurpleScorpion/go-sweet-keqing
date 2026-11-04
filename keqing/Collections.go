@@ -106,7 +106,10 @@ func List2Map[T comparable, K comparable](
 
 		switch onConflict {
 		case OverwriteNone:
-			panic("Duplicate key detected: " + fmt.Sprintf("%v", key))
+			if exists {
+				panic("Duplicate key detected: " + fmt.Sprintf("%v", key))
+			}
+			result[key] = item
 		case OverwriteFirst:
 			if !exists {
 				result[key] = item
@@ -139,7 +142,10 @@ func Set2Map[T comparable, K comparable](
 
 		switch onConflict {
 		case OverwriteNone:
-			panic("Duplicate key detected: " + fmt.Sprintf("%v", key))
+			if exists {
+				panic("Duplicate key detected: " + fmt.Sprintf("%v", key))
+			}
+			result[key] = item
 		case OverwriteFirst:
 			if !exists {
 				result[key] = item
