@@ -42,35 +42,11 @@ func (l *List[T]) Add(value T) {
 func (l *List[T]) Set(index int, value T) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
 	if index < 0 || index >= len(l.data) {
 		panic("Index out of bounds: " + Num2Str(index))
 	}
-
-	oldValue := l.data[index]
-	oldHash := l.hashFunc(oldValue)
-	newHash := l.hashFunc(value)
-
-	// 从 hashMap 中移除旧 hash 的当前索引
-	if indices, exists := l.hashMap[oldHash]; exists {
-		for i, idx := range indices {
-			if idx == index {
-				// 删除该索引记录
-				l.hashMap[oldHash] = append(indices[:i], indices[i+1:]...)
-				break
-			}
-		}
-		// 如果该 hash 已无引用，则删除该键
-		if len(l.hashMap[oldHash]) == 0 {
-			delete(l.hashMap, oldHash)
-		}
-	}
-
-	// 添加新的 hash 映射
-	l.hashMap[newHash] = append(l.hashMap[newHash], index)
-
-	// 替换数据
 	l.data[index] = value
+	l.rebuildIndexLocked()
 }
 
 // Get 获取指定索引位置的元素
@@ -108,16 +84,6 @@ func (l *List[T]) indexOfLocked(value T) int {
 		}
 	}
 	return -1
-}
-
-func (l *List[T]) matchingIndicesLocked(value T) []int {
-	var indices []int
-	for idx, item := range l.data {
-		if l.equal(item, value) {
-			indices = append(indices, idx)
-		}
-	}
-	return indices
 }
 
 func (l *List[T]) rebuildIndexLocked() {
@@ -220,46 +186,11 @@ func (l *List[T]) Remove(value T) bool {
 func (l *List[T]) RemoveAt(index int) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
 	if index < 0 || index >= len(l.data) {
 		return false
 	}
-
-	value := l.data[index]
-	h := l.hashFunc(value)
-
-	// 删除 hashMap 中该索引
-	indices, exists := l.hashMap[h]
-	if exists {
-		newIndices := make([]int, 0)
-		for _, idx := range indices {
-			if idx != index {
-				newIndices = append(newIndices, idx)
-			}
-		}
-		if len(newIndices) == 0 {
-			delete(l.hashMap, h)
-		} else {
-			l.hashMap[h] = newIndices
-		}
-	}
-
-	// 删除 data 中的元素并调整后续索引
 	l.data = append(l.data[:index], l.data[index+1:]...)
-
-	// 更新所有后续索引
-	for key, list := range l.hashMap {
-		newList := make([]int, 0)
-		for _, idx := range list {
-			if idx > index {
-				newList = append(newList, idx-1)
-			} else if idx < index {
-				newList = append(newList, idx)
-			}
-		}
-		l.hashMap[key] = newList
-	}
-
+	l.rebuildIndexLocked()
 	return true
 }
 
@@ -346,44 +277,21 @@ func (l *List[T]) Difference(other *List[T]) *List[T] {
 func (l *List[T]) RemoveAll(items ...T) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	defer l.rebuildIndexLocked()
-
-	for _, item := range items {
-		h := l.hashFunc(item)
-		indices := l.matchingIndicesLocked(item)
-		if len(indices) == 0 {
-			continue
-		}
-
-		var newIndices []int
-		for _, idx := range indices {
-			if !l.equal(l.data[idx], item) {
-				newIndices = append(newIndices, idx)
-			} else {
-				// 删除 data 中的元素
-				l.data = append(l.data[:idx], l.data[idx+1:]...)
-
-				// 更新后续索引
-				for key, list := range l.hashMap {
-					var newList []int
-					for _, i := range list {
-						if i > idx {
-							newList = append(newList, i-1)
-						} else if i < idx {
-							newList = append(newList, i)
-						}
-					}
-					l.hashMap[key] = newList
-				}
+	kept := make([]T, 0, len(l.data))
+	for _, item := range l.data {
+		remove := false
+		for _, candidate := range items {
+			if l.equal(item, candidate) {
+				remove = true
+				break
 			}
 		}
-
-		if len(newIndices) == 0 {
-			delete(l.hashMap, h)
-		} else {
-			l.hashMap[h] = newIndices
+		if !remove {
+			kept = append(kept, item)
 		}
 	}
+	l.data = kept
+	l.rebuildIndexLocked()
 }
 
 // RetainAll 保留指定集合中的元素，其余全部删除
