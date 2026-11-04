@@ -88,57 +88,62 @@ func (l *List[T]) Get(index int) T {
 func (l *List[T]) Contains(value T) bool {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
+	return l.containsLocked(value)
+}
 
-	h := l.hashFunc(value)
-	indices, exists := l.hashMap[h]
-	if !exists {
-		return false
-	}
-	for _, idx := range indices {
+func (l *List[T]) containsLocked(value T) bool {
+	for _, idx := range l.hashMap[l.hashFunc(value)] {
 		if l.equal(l.data[idx], value) {
 			return true
 		}
 	}
-	return false
+	// Custom equality or mutations through stored pointers can change the hash.
+	return l.indexOfLocked(value) >= 0
 }
 
-// IndexOf 返回第一个匹配项的索引位置，不存在则返回 -1
-func (l *List[T]) IndexOf(value T) int {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-
-	h := l.hashFunc(value)
-	indices, exists := l.hashMap[h]
-	if !exists {
-		return -1
-	}
-	for _, idx := range indices {
-		if l.equal(l.data[idx], value) {
+func (l *List[T]) indexOfLocked(value T) int {
+	for idx, item := range l.data {
+		if l.equal(item, value) {
 			return idx
 		}
 	}
 	return -1
 }
 
+func (l *List[T]) matchingIndicesLocked(value T) []int {
+	var indices []int
+	for idx, item := range l.data {
+		if l.equal(item, value) {
+			indices = append(indices, idx)
+		}
+	}
+	return indices
+}
+
+func (l *List[T]) rebuildIndexLocked() {
+	l.hashMap = make(map[uint64][]int)
+	for idx, item := range l.data {
+		h := l.hashFunc(item)
+		l.hashMap[h] = append(l.hashMap[h], idx)
+	}
+}
+
+// IndexOf 返回第一个匹配项的索引位置，不存在则返回 -1
+func (l *List[T]) IndexOf(value T) int {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.indexOfLocked(value)
+}
+
 // LastIndexOf 返回最后一个匹配项的索引位置，不存在则返回 -1
 func (l *List[T]) LastIndexOf(value T) int {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-
-	h := l.hashFunc(value)
-	indices, exists := l.hashMap[h]
-	if !exists {
-		return -1
-	}
-
-	// 倒序遍历索引数组，找到第一个等于 value 的位置
-	for i := len(indices) - 1; i >= 0; i-- {
-		idx := indices[i]
+	for idx := len(l.data) - 1; idx >= 0; idx-- {
 		if l.equal(l.data[idx], value) {
 			return idx
 		}
 	}
-
 	return -1
 }
 
@@ -202,44 +207,13 @@ func (l *List[T]) Clear() {
 func (l *List[T]) Remove(value T) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	h := l.hashFunc(value)
-	indices, exists := l.hashMap[h]
-	if !exists {
+	idx := l.indexOfLocked(value)
+	if idx < 0 {
 		return false
 	}
-
-	for i, idx := range indices {
-		if l.equal(l.data[idx], value) {
-			// 删除 data 中的元素
-			l.data = append(l.data[:idx], l.data[idx+1:]...)
-
-			// 更新 hashMap 中所有后续索引
-			deleteKey := false
-			if len(indices) == 1 {
-				deleteKey = true
-			}
-			if deleteKey {
-				delete(l.hashMap, h)
-			} else {
-				// 移除当前索引并更新后续索引
-				l.hashMap[h] = append(indices[:i], indices[i+1:]...)
-			}
-
-			// 调整后续元素的索引映射
-			for key, list := range l.hashMap {
-				for j := range list {
-					if list[j] > idx {
-						list[j]--
-					}
-				}
-				l.hashMap[key] = list
-			}
-
-			return true
-		}
-	}
-	return false
+	l.data = append(l.data[:idx], l.data[idx+1:]...)
+	l.rebuildIndexLocked()
+	return true
 }
 
 // RemoveAt 删除指定索引位置的元素
@@ -303,16 +277,9 @@ func (l *List[T]) Iterator() <-chan T {
 	return ch
 }
 
-// equal 比较两个元素是否相等（使用 hash 相等 + Go 的 == 运算符兜底）
+// equal 比较实际元素，hash 仅用于定位候选。
 func (l *List[T]) equal(a, b T) bool {
-	if l.hashFunc(a) == l.hashFunc(b) {
-		equal, ok := any(a).(comparableEqual[T])
-		if ok && equal.Equal(b) {
-			return true
-		}
-		return true
-	}
-	return false
+	return collectionEqual(a, b)
 }
 
 // Union 返回两个 List 的并集（保留顺序）
@@ -379,11 +346,12 @@ func (l *List[T]) Difference(other *List[T]) *List[T] {
 func (l *List[T]) RemoveAll(items ...T) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	defer l.rebuildIndexLocked()
 
 	for _, item := range items {
 		h := l.hashFunc(item)
-		indices, exists := l.hashMap[h]
-		if !exists {
+		indices := l.matchingIndicesLocked(item)
+		if len(indices) == 0 {
 			continue
 		}
 
@@ -422,41 +390,17 @@ func (l *List[T]) RemoveAll(items ...T) {
 func (l *List[T]) RetainAll(items ...T) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-
-	itemSet := make(map[uint64][]T)
-	for _, item := range items {
-		h := l.hashFunc(item)
-		itemSet[h] = append(itemSet[h], item)
-	}
-
-	newHashMap := make(map[uint64][]int)
-	newData := make([]T, 0)
-
-	var newIndex int
+	kept := make([]T, 0, len(l.data))
 	for _, item := range l.data {
-		h := l.hashFunc(item)
-		candidates, ok := itemSet[h]
-		if !ok {
-			continue
-		}
-
-		found := false
-		for _, candidate := range candidates {
+		for _, candidate := range items {
 			if l.equal(item, candidate) {
-				found = true
+				kept = append(kept, item)
 				break
 			}
 		}
-
-		if found {
-			newData = append(newData, item)
-			newHashMap[h] = append(newHashMap[h], newIndex)
-			newIndex++
-		}
 	}
-
-	l.data = newData
-	l.hashMap = newHashMap
+	l.data = kept
+	l.rebuildIndexLocked()
 }
 
 // Filter 返回一个满足条件的新 List，不会修改原集合

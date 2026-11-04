@@ -21,6 +21,35 @@ type comparableEqual[T any] interface {
 	Equal(T) bool
 }
 
+// collectionEqual keeps equality independent of the hash function. Interface
+// values can hold dynamically non-comparable values even when T is comparable.
+func collectionEqual[T comparable](a, b T) bool {
+	av, bv := reflect.ValueOf(a), reflect.ValueOf(b)
+	if !av.IsValid() || !bv.IsValid() {
+		return !av.IsValid() && !bv.IsValid()
+	}
+	// Do not invoke a method on a nil pointer receiver.
+	if collectionNil(av) || collectionNil(bv) {
+		return reflect.DeepEqual(a, b)
+	}
+	if equal, ok := any(a).(comparableEqual[T]); ok {
+		return equal.Equal(b)
+	}
+	if av.Comparable() && bv.Comparable() {
+		return a == b
+	}
+	return reflect.DeepEqual(a, b)
+}
+
+func collectionNil(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
+}
+
 // Hashable 接口用于自定义对象实现 hash 计算
 type Hashable interface {
 	Hash() uint64

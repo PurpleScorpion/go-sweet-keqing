@@ -7,7 +7,7 @@ import (
 // Set 是一个线程安全、可自定义 hash 函数的集合结构
 type Set[T comparable] struct {
 	data     []T
-	hashMap  map[uint64]struct{}
+	hashMap  map[uint64][]int
 	hashFunc func(T) uint64
 	mu       sync.RWMutex
 }
@@ -21,7 +21,7 @@ func NewSet[T comparable](hashFunc func(T) uint64) *Set[T] {
 	}
 	return &Set[T]{
 		data:     make([]T, 0),
-		hashMap:  make(map[uint64]struct{}),
+		hashMap:  make(map[uint64][]int),
 		hashFunc: hashFunc,
 	}
 }
@@ -30,13 +30,12 @@ func NewSet[T comparable](hashFunc func(T) uint64) *Set[T] {
 func (s *Set[T]) Add(value T) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	h := s.hashFunc(value)
-	if _, exists := s.hashMap[h]; exists {
+	if s.indexOfLocked(value) >= 0 {
 		return false
 	}
+	h := s.hashFunc(value)
 	s.data = append(s.data, value)
-	s.hashMap[h] = struct{}{}
+	s.hashMap[h] = append(s.hashMap[h], len(s.data)-1)
 	return true
 }
 
@@ -44,10 +43,30 @@ func (s *Set[T]) Add(value T) bool {
 func (s *Set[T]) Contains(value T) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.indexOfLocked(value) >= 0
+}
 
-	h := s.hashFunc(value)
-	_, exists := s.hashMap[h]
-	return exists
+func (s *Set[T]) indexOfLocked(value T) int {
+	for _, idx := range s.hashMap[s.hashFunc(value)] {
+		if s.equal(s.data[idx], value) {
+			return idx
+		}
+	}
+	// Equal may match across hashes, and a stored pointer's fields may change.
+	for idx, item := range s.data {
+		if s.equal(item, value) {
+			return idx
+		}
+	}
+	return -1
+}
+
+func (s *Set[T]) rebuildIndexLocked() {
+	s.hashMap = make(map[uint64][]int)
+	for idx, item := range s.data {
+		h := s.hashFunc(item)
+		s.hashMap[h] = append(s.hashMap[h], idx)
+	}
 }
 
 // GetAll 获取所有元素切片
@@ -88,7 +107,7 @@ func (s *Set[T]) Clear() {
 	defer s.mu.Unlock()
 
 	s.data = nil
-	s.hashMap = make(map[uint64]struct{})
+	s.hashMap = make(map[uint64][]int)
 }
 
 // Iterator 返回一个只读通道作为迭代器
@@ -127,8 +146,7 @@ func (s *Set[T]) Intersect(other *Set[T]) *Set[T] {
 
 	intersection := NewSet[T](s.hashFunc)
 	for _, item := range s.data {
-		h := s.hashFunc(item)
-		if _, exists := other.hashMap[h]; exists {
+		if other.indexOfLocked(item) >= 0 {
 			intersection.Add(item)
 		}
 	}
@@ -144,8 +162,7 @@ func (s *Set[T]) Difference(other *Set[T]) *Set[T] {
 
 	diff := NewSet[T](s.hashFunc)
 	for _, item := range s.data {
-		h := s.hashFunc(item)
-		if _, exists := other.hashMap[h]; !exists {
+		if other.indexOfLocked(item) < 0 {
 			diff.Add(item)
 		}
 	}
@@ -167,81 +184,56 @@ func (s *Set[T]) ToString() string {
 func (s *Set[T]) Remove(value T) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	h := s.hashFunc(value)
-	if _, exists := s.hashMap[h]; !exists {
+	idx := s.indexOfLocked(value)
+	if idx < 0 {
 		return false
 	}
-
-	// 从 hashMap 中删除
-	delete(s.hashMap, h)
-
-	// 从 data 切片中删除元素（保留顺序）
-	for i, item := range s.data {
-		if s.equal(item, value) {
-			s.data = append(s.data[:i], s.data[i+1:]...)
-			return true
-		}
-	}
-
+	s.data = append(s.data[:idx], s.data[idx+1:]...)
+	s.rebuildIndexLocked()
 	return true
 }
 
-// equal 比较两个元素是否相等（使用 hash 相等 + Go 的 == 运算符兜底）
+// equal 比较实际元素，hash 仅用于定位候选。
 func (s *Set[T]) equal(a, b T) bool {
-	if s.hashFunc(a) == s.hashFunc(b) {
-		// 如果是基础类型或支持比较的结构体，直接 ==
-		equal, ok := any(a).(comparableEqual[T])
-		if ok && equal.Equal(b) {
-			return true
-		}
-		return s.hashFunc(a) == s.hashFunc(b)
-	}
-	return false
+	return collectionEqual(a, b)
 }
 
 // RemoveAll 批量删除多个元素
 func (s *Set[T]) RemoveAll(items ...T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	for _, item := range items {
-		h := s.hashFunc(item)
-		delete(s.hashMap, h)
-
-		for i, v := range s.data {
-			if s.equal(v, item) {
-				s.data = append(s.data[:i], s.data[i+1:]...)
+	kept := make([]T, 0, len(s.data))
+	for _, item := range s.data {
+		remove := false
+		for _, candidate := range items {
+			if s.equal(item, candidate) {
+				remove = true
 				break
 			}
 		}
+		if !remove {
+			kept = append(kept, item)
+		}
 	}
+	s.data = kept
+	s.rebuildIndexLocked()
 }
 
 // RetainAll 保留指定的元素，删除其他所有
 func (s *Set[T]) RetainAll(items ...T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	newHashMap := make(map[uint64]struct{})
-	newData := make([]T, 0)
-
-	itemMap := make(map[uint64]struct{})
-	for _, item := range items {
-		h := s.hashFunc(item)
-		itemMap[h] = struct{}{}
-	}
-
+	kept := make([]T, 0, len(s.data))
 	for _, item := range s.data {
-		h := s.hashFunc(item)
-		if _, keep := itemMap[h]; keep {
-			newHashMap[h] = struct{}{}
-			newData = append(newData, item)
+		for _, candidate := range items {
+			if s.equal(item, candidate) {
+				kept = append(kept, item)
+				break
+			}
 		}
 	}
-
-	s.hashMap = newHashMap
-	s.data = newData
+	s.data = kept
+	s.rebuildIndexLocked()
 }
 
 // Filter 返回一个满足条件的新 Set，不会修改原集合
