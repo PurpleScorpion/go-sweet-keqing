@@ -149,11 +149,10 @@ func GetDaysInMonth(data any, years ...int) int {
 	if err != nil {
 		panic(err)
 	}
-	if year == 0 {
-		if years == nil || len(years) == 0 {
-			panic("please provide the year")
-		}
+	if len(years) > 0 {
 		year = years[0]
+	} else if _, fromTime := data.(time.Time); !fromTime {
+		panic("please provide the year")
 	}
 
 	// 获取下个月的第一天
@@ -173,9 +172,12 @@ func getMonthFromData(data any) (int, time.Month, error) {
 	case int32:
 		month = int(t)
 	case int64:
+		if t < 1 || t > 12 {
+			return 0, 0, fmt.Errorf("month must be between 1 and 12: %d", t)
+		}
 		month = int(t)
 	case time.Month:
-		return 0, t, nil
+		month = int(t)
 	case time.Time:
 		return t.Year(), t.Month(), nil
 	default:
