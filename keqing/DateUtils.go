@@ -170,12 +170,18 @@ func GetDaysInMonth(data any, years ...int) int {
 		panic("please provide the year")
 	}
 
-	// 获取下个月的第一天
-	firstDayOfNextMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Local)
-	// 获取当前月的最后一天
-	lastDayOfMonth := firstDayOfNextMonth.AddDate(0, 0, -1)
-	// 获取最后一天的日期，即该月的天数
-	return lastDayOfMonth.Day()
+	// Gregorian month lengths do not depend on the machine's time zone.
+	switch month {
+	case time.February:
+		if year%400 == 0 || year%4 == 0 && year%100 != 0 {
+			return 29
+		}
+		return 28
+	case time.April, time.June, time.September, time.November:
+		return 30
+	default:
+		return 31
+	}
 }
 func getMonthFromData(data any) (int, time.Month, error) {
 	var month int
@@ -253,8 +259,10 @@ func GetStartAndEnd4Yesterday() (time.Time, time.Time) {
 }
 
 func startAndEnd4Yesterday(now time.Time) (time.Time, time.Time) {
-	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	yesterdayStart := todayStart.AddDate(0, 0, -1)
+	today := calendarDate(now)
+	todayStart := calendarDateStart(today, now.Location())
+	yesterdayStart := calendarDateStart(today.AddDate(0, 0, -1), now.Location())
+	// A wholly skipped civil date has no instants: end is one nanosecond before start.
 	return yesterdayStart, todayStart.Add(-time.Nanosecond)
 }
 
@@ -274,8 +282,10 @@ func GetStartAndEnd4Today() (time.Time, time.Time) {
 }
 
 func startAndEnd4Today(now time.Time) (time.Time, time.Time) {
-	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return start, start.AddDate(0, 0, 1).Add(-time.Nanosecond)
+	today := calendarDate(now)
+	start := calendarDateStart(today, now.Location())
+	next := calendarDateStart(today.AddDate(0, 0, 1), now.Location())
+	return start, next.Add(-time.Nanosecond)
 }
 
 /*
@@ -294,8 +304,60 @@ func GetStartAndEnd4CurrentMonth() (time.Time, time.Time) {
 }
 
 func startAndEnd4CurrentMonth(now time.Time) (time.Time, time.Time) {
-	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	return start, start.AddDate(0, 1, 0).Add(-time.Nanosecond)
+	month := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	start := calendarDateStart(month, now.Location())
+	next := calendarDateStart(month.AddDate(0, 1, 0), now.Location())
+	return start, next.Add(-time.Nanosecond)
+}
+
+// calendarDate represents a civil date in UTC for calendar arithmetic only.
+// Arithmetic on an already normalized local midnight can change the intended date.
+func calendarDate(date time.Time) time.Time {
+	return time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// calendarDateStart returns the first valid instant at or after a local civil
+// date's midnight. It chooses the first occurrence of a repeated midnight and
+// advances past a missing midnight (or a wholly skipped date).
+func calendarDateStart(date time.Time, loc *time.Location) time.Time {
+	cursor := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, loc)
+	// time.Date may choose the second occurrence of an ambiguous midnight.
+	// Walk earlier zone intervals while they still reach the requested civil date.
+	for {
+		start, _ := cursor.ZoneBounds()
+		if start.IsZero() {
+			break
+		}
+		previous := start.Add(-time.Nanosecond)
+		if calendarDate(previous).Before(date) {
+			break
+		}
+		cursor = previous
+	}
+	for {
+		start, end := cursor.ZoneBounds()
+		_, offset := cursor.Zone()
+		// A fixed offset has no missing/ambiguous clock times. Avoid converting
+		// offsets to time.Duration, which would unnecessarily limit large fixed zones.
+		candidate := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, time.FixedZone("", offset))
+		if !start.IsZero() && candidate.Before(start) {
+			candidate = start
+		}
+		actual := candidate.In(loc)
+		_, actualOffset := actual.Zone()
+		if actualOffset == offset {
+			// Verify the candidate against the actual zone rather than relying on
+			// ZoneBounds' synthetic POSIX year-end boundary (which may be stale
+			// on the last day of a future leap year).
+			return actual
+		}
+		if end.IsZero() || !end.After(cursor) {
+			panic("time zone boundary does not advance")
+		}
+		// The requested midnight is beyond this interval. Crossing the transition
+		// finds the first valid instant when a forward jump skipped midnight.
+		cursor = end
+	}
 }
 
 /*
