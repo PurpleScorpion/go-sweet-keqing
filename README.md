@@ -338,7 +338,7 @@
     Snake2BigCamel(str) string // 下划线转大驼峰
     Camel2Snake(str) string // 驼峰转下划线 (大小驼峰通吃)
     Num2Str(num) string // 数字转字符串 int家族/float家族 通用
-    Float2Str(num interface{}, precision int) string // 浮点数转字符串 (可选择保留的小数位数) 若不需要精度，则直接调用Num2Str即可
+    Float2Str(num interface{}, precision int) string // 指定保留的小数位数；不指定精度时调用 Num2Str
     ParseInt64(str) int64 // 将字符串解析成int64
     ParseInt32(str) int32 // 将字符串解析成int32
     ParseInt16(str) int16 // 将字符串解析成int16
@@ -393,8 +393,9 @@ func main() {
 
 现有导出函数的名称、参数和返回值保持不变。上面的参数与返回值修订纠正的是旧 README，已有能够编译的调用无需因此改写。新增的 `RandomIdWithError`、`RsaGenerateKeyWithError`、`FileExistsWithError` 可按需替换旧入口来处理错误。
 
-- **金额和数值**：元字符串按十进制精确转换（支持科学计数法），每个金额参数先转换为整数分，超出分的部分向零截断；乘除结果也向零截断。例如 `Yuan2Fen("0.29") == 29`、`Yuan2Fen("-1.239") == -123`。金额 NaN/Inf、格式错误、除零和超出 int64 分范围会 panic。整数解析和 YAML 数值缩窄转换越界会 panic；通用 ParseFloat 对解析溢出报错，但仍允许显式的 NaN/Inf 字面量。
+- **金额和数值**：元字符串按十进制精确转换（支持科学计数法），每个金额参数先转换为整数分，超出分的部分向零截断；乘除结果也向零截断。例如 `Yuan2Fen("0.29") == 29`、`Yuan2Fen("-1.239") == -123`。金额 NaN/Inf、格式错误、除零和超出 int64 分范围会 panic。整数解析和 YAML 整数转换越界会 panic，YAML 有限浮点数缩窄为 float32 发生溢出也会 panic；通用 ParseFloat 对解析溢出报错，但通用浮点解析和 YAML 浮点取值仍允许显式的 NaN/Inf。
 - **集合相等与迭代**：hash 碰撞不会合并不同元素。实现了 `Equal(T) bool` 的类型使用该结果（包括 false）；其他可比较值使用 Go `==`，指针默认按地址比较，`any` 内不可比较的值使用 `reflect.DeepEqual`。业务上按某几个字段去重时应实现 Equal，不能只靠 hash。Iterator 返回浅快照，可以提前停止或在迭代中修改原集合；两个集合的运算分别读取快照，不保证两份快照来自同一时刻。快照不会复制指针所指对象，外部修改仍需自行同步。
+- **集合查找与回调**：普通可比较值的 Set 使用哈希桶查找；自定义 Equal、动态接口值或自定义 hash 涉及引用状态时，可能回退到线性扫描，批量构建最坏为 O(n²)。默认 hash 按 Go 值语义计算，包含正负零归一化和指针身份，不依赖 Stringer。Filter、DeepCopy、List2Map/Set2Map 先取浅快照，再在原集合锁外执行回调；回调可查询或修改原集合，新增的元素不参与本次结果。hash、Equal 和排序比较器应为无副作用的函数，不要重入正在操作的同一集合；自定义 hash 应保持确定性，对相等值给出相同 hash。
 - **随机 ID**：默认 MAC 哈希 workerID 仅适用于单进程。多实例部署必须由部署方分配互不重复的 workerID，并在每个进程第一次生成 ID 前调用 `ConfigureRandomID`，检查返回错误；首次生成后不可重新配置。此接口不提供分布式分配或跨进程重启的状态持久化。旧入口在初始化失败、时钟回拨时 panic；需要恢复错误时使用 `RandomIdWithError`。
 - **RSA 密钥**：生成到目录内的 `privateKey.pem`、`publicKey.pem`；任一同名文件已存在都会失败，不覆盖旧密钥。轮换应使用新目录。Unix 私钥权限为 0600，Windows 的访问控制依赖目录 ACL。写入、同步、关闭失败会返回错误或由旧入口 panic；失败清理仅处理本次创建且身份仍匹配的文件，不承诺两个文件跨崩溃原子发布。`RsaLoadKey` 在解析及公私钥匹配成功后一次替换全局密钥对，失败保留旧状态；错误 PEM 仍沿用原有 panic 行为。
 - **文件与日期**：CopyFile 拒绝复制到同一文件（包括硬链接），避免截断源文件。FileExists 查询失败为 false，可用 WithError 版本区分原因。DateAddDay/DateSubDay 按日历天计算，夏令时切换日可能是 23 或 25 小时；时分秒仍是固定时长。今天、昨天、当月的范围终点均包含最后一纳秒；对应 UTC 方法将本地日历边界转换为 UTC。
