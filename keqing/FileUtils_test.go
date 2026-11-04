@@ -1,10 +1,36 @@
 package keqing
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestFileExistsInvalidPath(t *testing.T) {
+	if FileExists("invalid\x00path") {
+		t.Fatal("invalid path reported as existing")
+	}
+}
+
+func TestFileExistsWithError(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "file")
+	if err := os.WriteFile(file, []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{dir, file} {
+		if exists, err := FileExistsWithError(path); !exists || err != nil {
+			t.Fatalf("existing %s: %v %v", path, exists, err)
+		}
+	}
+	if exists, err := FileExistsWithError(filepath.Join(dir, "missing")); exists || err != nil {
+		t.Fatalf("missing: %v %v", exists, err)
+	}
+	if exists, err := FileExistsWithError("invalid\x00path"); exists || err == nil || errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("invalid: %v %v", exists, err)
+	}
+}
 
 func TestCopyFilePreservesSameFile(t *testing.T) {
 	for _, alias := range []bool{false, true} {

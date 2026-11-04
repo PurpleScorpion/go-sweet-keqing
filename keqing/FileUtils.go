@@ -19,10 +19,21 @@ func MkdirAll(path string) {
 文件存在判断
 */
 func FileExists(path string) bool {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return false
+	exists, _ := FileExistsWithError(path)
+	return exists
+}
+
+// FileExistsWithError distinguishes a missing path from a failed filesystem query.
+// FileExists keeps its bool signature and returns false for either case.
+func FileExistsWithError(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
 	}
-	return true
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 /*
