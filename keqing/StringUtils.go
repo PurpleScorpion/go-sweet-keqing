@@ -318,7 +318,7 @@ func Snake2BigCamel(s string) string {
 驼峰转下划线
 */
 func Camel2Snake(s string) string {
-	if IsEmpty(s) {
+	if s == "" {
 		return s
 	}
 
@@ -493,7 +493,7 @@ func ParseFloat64(dataStr string) float64 {
 }
 
 func Split(str string, sep string) []string {
-	if IsEmpty(str) {
+	if str == "" {
 		return []string{str}
 	}
 	if !strings.Contains(str, sep) {
