@@ -158,6 +158,36 @@ func collectionTypeNeedsScan(t reflect.Type, customHash bool) bool {
 	return false
 }
 
+// filterCollection preserves source order and the direction of Equal calls.
+func filterCollection[T comparable](data, items []T, hashFunc func(T) uint64, scan bool, keepMatches bool, equal func(T, T) bool) []T {
+	var buckets map[uint64][]T
+	if !scan {
+		buckets = make(map[uint64][]T, len(items))
+		for _, item := range items {
+			hash := hashFunc(item)
+			buckets[hash] = append(buckets[hash], item)
+		}
+	}
+	kept := make([]T, 0, len(data))
+	for _, item := range data {
+		candidates := items
+		if !scan {
+			candidates = buckets[hashFunc(item)]
+		}
+		matched := false
+		for _, candidate := range candidates {
+			if equal(item, candidate) {
+				matched = true
+				break
+			}
+		}
+		if matched == keepMatches {
+			kept = append(kept, item)
+		}
+	}
+	return kept
+}
+
 type BasicType interface {
 	int | int8 | int16 | int32 | int64 |
 		uint | uint8 | uint16 | uint32 | uint64 |

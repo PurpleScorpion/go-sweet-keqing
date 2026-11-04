@@ -8,23 +8,32 @@ import (
 
 // List 是一个线程安全、可自定义 hash 函数的有序列表结构
 type List[T comparable] struct {
-	data     []T
-	hashMap  map[uint64][]int // 支持重复值，记录每个 hash 对应的所有索引位置
-	hashFunc func(T) uint64
-	mu       sync.RWMutex
+	data           []T
+	hashMap        map[uint64][]int // 支持重复值，记录每个 hash 对应的所有索引位置
+	hashFunc       func(T) uint64
+	scanOnHashMiss bool
+	mu             sync.RWMutex
 }
 
 // NewList 创建一个新的 List，可以传入自定义 hash 函数（可为 nil）
 func NewList[T comparable](hashFunc func(T) uint64) *List[T] {
+	scanOnHashMiss := collectionNeedsHashScan[T](hashFunc != nil)
 	if hashFunc == nil {
 		hashFunc = func(t T) uint64 {
 			return defaultHash(t)
 		}
 	}
+	return newListWithHash(hashFunc, scanOnHashMiss)
+}
+
+// Derived collections retain the original hash strategy rather than classifying
+// the already-resolved default hash function as a user-provided callback.
+func newListWithHash[T comparable](hashFunc func(T) uint64, scanOnHashMiss bool) *List[T] {
 	return &List[T]{
-		data:     make([]T, 0),
-		hashMap:  make(map[uint64][]int),
-		hashFunc: hashFunc,
+		data:           make([]T, 0),
+		hashMap:        make(map[uint64][]int),
+		hashFunc:       hashFunc,
+		scanOnHashMiss: scanOnHashMiss,
 	}
 }
 
@@ -68,18 +77,45 @@ func (l *List[T]) Contains(value T) bool {
 }
 
 func (l *List[T]) containsLocked(value T) bool {
-	for _, idx := range l.hashMap[l.hashFunc(value)] {
-		if l.equal(l.data[idx], value) {
-			return true
+	if l.scanOnHashMiss {
+		// Contains does not need first/last ordering, so an Equal match in the
+		// candidate bucket can avoid the fallback scan.
+		for _, idx := range l.hashMap[l.hashFunc(value)] {
+			if l.equal(l.data[idx], value) {
+				return true
+			}
 		}
 	}
-	// Custom equality or mutations through stored pointers can change the hash.
 	return l.indexOfLocked(value) >= 0
 }
 
 func (l *List[T]) indexOfLocked(value T) int {
-	for idx, item := range l.data {
-		if l.equal(item, value) {
+	return l.indexOfByLocked(value, l.equal, false)
+}
+
+func (l *List[T]) indexOfByLocked(value T, equal func(T, T) bool, last bool) int {
+	if l.scanOnHashMiss {
+		// Equal can match across hashes. Scan in source order even if a later
+		// matching value happens to share the query's hash.
+		for i := 0; i < len(l.data); i++ {
+			idx := i
+			if last {
+				idx = len(l.data) - 1 - i
+			}
+			if equal(l.data[idx], value) {
+				return idx
+			}
+		}
+		return -1
+	}
+	indexes := l.hashMap[l.hashFunc(value)]
+	for i := 0; i < len(indexes); i++ {
+		position := i
+		if last {
+			position = len(indexes) - 1 - i
+		}
+		idx := indexes[position]
+		if equal(l.data[idx], value) {
 			return idx
 		}
 	}
@@ -105,12 +141,7 @@ func (l *List[T]) IndexOf(value T) int {
 func (l *List[T]) LastIndexOf(value T) int {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	for idx := len(l.data) - 1; idx >= 0; idx-- {
-		if l.equal(l.data[idx], value) {
-			return idx
-		}
-	}
-	return -1
+	return l.indexOfByLocked(value, l.equal, true)
 }
 
 // GetData 获取所有元素切片
@@ -214,7 +245,9 @@ func (l *List[T]) equal(a, b T) bool {
 // Union 返回两个 List 的并集（保留顺序）
 func (l *List[T]) Union(other *List[T]) *List[T] {
 	left, right := l.GetData(), other.GetData()
-	union := AsList(left, l.hashFunc)
+	union := newListWithHash(l.hashFunc, l.scanOnHashMiss)
+	union.data = left
+	union.rebuildIndexLocked()
 	for _, item := range right {
 		if !union.Contains(item) {
 			union.Add(item)
@@ -226,10 +259,10 @@ func (l *List[T]) Union(other *List[T]) *List[T] {
 // Intersect 返回两个 List 的交集（保留顺序）
 func (l *List[T]) Intersect(other *List[T]) *List[T] {
 	left, right := l.GetData(), other.GetData()
-	otherSnapshot := NewList[T](other.hashFunc)
+	otherSnapshot := newListWithHash(other.hashFunc, other.scanOnHashMiss)
 	otherSnapshot.data = right
 	otherSnapshot.rebuildIndexLocked()
-	intersection := NewList[T](l.hashFunc)
+	intersection := newListWithHash(l.hashFunc, l.scanOnHashMiss)
 	for _, item := range left {
 		if otherSnapshot.Contains(item) {
 			intersection.Add(item)
@@ -241,10 +274,10 @@ func (l *List[T]) Intersect(other *List[T]) *List[T] {
 // Difference 返回两个 List 的差集（属于 l 不属于 other 的元素）
 func (l *List[T]) Difference(other *List[T]) *List[T] {
 	left, right := l.GetData(), other.GetData()
-	otherSnapshot := NewList[T](other.hashFunc)
+	otherSnapshot := newListWithHash(other.hashFunc, other.scanOnHashMiss)
 	otherSnapshot.data = right
 	otherSnapshot.rebuildIndexLocked()
-	diff := NewList[T](l.hashFunc)
+	diff := newListWithHash(l.hashFunc, l.scanOnHashMiss)
 	for _, item := range left {
 		if !otherSnapshot.Contains(item) {
 			diff.Add(item)
@@ -257,20 +290,7 @@ func (l *List[T]) Difference(other *List[T]) *List[T] {
 func (l *List[T]) RemoveAll(items ...T) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	kept := make([]T, 0, len(l.data))
-	for _, item := range l.data {
-		remove := false
-		for _, candidate := range items {
-			if l.equal(item, candidate) {
-				remove = true
-				break
-			}
-		}
-		if !remove {
-			kept = append(kept, item)
-		}
-	}
-	l.data = kept
+	l.data = filterCollection(l.data, items, l.hashFunc, l.scanOnHashMiss, false, l.equal)
 	l.rebuildIndexLocked()
 }
 
@@ -278,16 +298,7 @@ func (l *List[T]) RemoveAll(items ...T) {
 func (l *List[T]) RetainAll(items ...T) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	kept := make([]T, 0, len(l.data))
-	for _, item := range l.data {
-		for _, candidate := range items {
-			if l.equal(item, candidate) {
-				kept = append(kept, item)
-				break
-			}
-		}
-	}
-	l.data = kept
+	l.data = filterCollection(l.data, items, l.hashFunc, l.scanOnHashMiss, true, l.equal)
 	l.rebuildIndexLocked()
 }
 
@@ -295,7 +306,7 @@ func (l *List[T]) RetainAll(items ...T) {
 func (l *List[T]) Filter(predicate func(T) bool) *List[T] {
 	snapshot := l.GetData()
 
-	filtered := NewList[T](l.hashFunc)
+	filtered := newListWithHash(l.hashFunc, l.scanOnHashMiss)
 
 	for _, item := range snapshot {
 		if predicate(item) {
@@ -333,7 +344,7 @@ func (l *List[T]) SubList(indexs ...int) *List[T] {
 		panic("End index out of bounds: " + Num2Str(end))
 	}
 
-	sub := NewList[T](l.hashFunc)
+	sub := newListWithHash(l.hashFunc, l.scanOnHashMiss)
 	for i := start; i < end; i++ {
 		sub.Add(l.data[i])
 	}
@@ -441,7 +452,7 @@ func (l *List[T]) sortBasic(asc bool) {
 func (l *List[T]) DeepCopy(cloneFunc func(T) T) *List[T] {
 	snapshot := l.GetData()
 
-	copyList := NewList[T](l.hashFunc)
+	copyList := newListWithHash(l.hashFunc, l.scanOnHashMiss)
 
 	for _, item := range snapshot {
 		copyList.Add(cloneFunc(item))
@@ -455,7 +466,7 @@ func (l *List[T]) Copy() *List[T] {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
-	copyList := NewList[T](l.hashFunc)
+	copyList := newListWithHash(l.hashFunc, l.scanOnHashMiss)
 
 	for _, item := range l.data {
 		copyList.Add(item)
@@ -468,7 +479,7 @@ func (l *List[T]) ToSet() *Set[T] {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
-	set := NewSet[T](l.hashFunc)
+	set := newSetWithHash(l.hashFunc, l.scanOnHashMiss)
 
 	for _, item := range l.data {
 		set.Add(item)

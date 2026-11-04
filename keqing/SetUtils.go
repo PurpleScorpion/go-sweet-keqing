@@ -21,6 +21,11 @@ func NewSet[T comparable](hashFunc func(T) uint64) *Set[T] {
 			return defaultHash(t)
 		}
 	}
+	return newSetWithHash(hashFunc, scanOnHashMiss)
+}
+
+// Preserve strategy metadata when copying, filtering, or converting a collection.
+func newSetWithHash[T comparable](hashFunc func(T) uint64, scanOnHashMiss bool) *Set[T] {
 	return &Set[T]{
 		data:           make([]T, 0),
 		hashMap:        make(map[uint64][]int),
@@ -137,7 +142,8 @@ func (s *Set[T]) Iterator() <-chan T {
 // Union 求两个集合的并集
 func (s *Set[T]) Union(other *Set[T]) *Set[T] {
 	left, right := s.GetData(), other.GetData()
-	union := AsSet(left, s.hashFunc)
+	union := newSetWithHash(s.hashFunc, s.scanOnHashMiss)
+	union.addAll(left...)
 	union.addAll(right...)
 	return union
 }
@@ -145,10 +151,10 @@ func (s *Set[T]) Union(other *Set[T]) *Set[T] {
 // Intersect 求两个集合的交集
 func (s *Set[T]) Intersect(other *Set[T]) *Set[T] {
 	left, right := s.GetData(), other.GetData()
-	otherSnapshot := NewSet[T](other.hashFunc)
+	otherSnapshot := newSetWithHash(other.hashFunc, other.scanOnHashMiss)
 	otherSnapshot.data = right
 	otherSnapshot.rebuildIndexLocked()
-	intersection := NewSet[T](s.hashFunc)
+	intersection := newSetWithHash(s.hashFunc, s.scanOnHashMiss)
 	for _, item := range left {
 		if otherSnapshot.Contains(item) {
 			intersection.Add(item)
@@ -160,10 +166,10 @@ func (s *Set[T]) Intersect(other *Set[T]) *Set[T] {
 // Difference 求两个集合的差集（属于 s 不属于 other 的元素）
 func (s *Set[T]) Difference(other *Set[T]) *Set[T] {
 	left, right := s.GetData(), other.GetData()
-	otherSnapshot := NewSet[T](other.hashFunc)
+	otherSnapshot := newSetWithHash(other.hashFunc, other.scanOnHashMiss)
 	otherSnapshot.data = right
 	otherSnapshot.rebuildIndexLocked()
-	diff := NewSet[T](s.hashFunc)
+	diff := newSetWithHash(s.hashFunc, s.scanOnHashMiss)
 	for _, item := range left {
 		if !otherSnapshot.Contains(item) {
 			diff.Add(item)
@@ -205,20 +211,7 @@ func (s *Set[T]) equal(a, b T) bool {
 func (s *Set[T]) RemoveAll(items ...T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	kept := make([]T, 0, len(s.data))
-	for _, item := range s.data {
-		remove := false
-		for _, candidate := range items {
-			if s.equal(item, candidate) {
-				remove = true
-				break
-			}
-		}
-		if !remove {
-			kept = append(kept, item)
-		}
-	}
-	s.data = kept
+	s.data = filterCollection(s.data, items, s.hashFunc, s.scanOnHashMiss, false, s.equal)
 	s.rebuildIndexLocked()
 }
 
@@ -226,16 +219,7 @@ func (s *Set[T]) RemoveAll(items ...T) {
 func (s *Set[T]) RetainAll(items ...T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	kept := make([]T, 0, len(s.data))
-	for _, item := range s.data {
-		for _, candidate := range items {
-			if s.equal(item, candidate) {
-				kept = append(kept, item)
-				break
-			}
-		}
-	}
-	s.data = kept
+	s.data = filterCollection(s.data, items, s.hashFunc, s.scanOnHashMiss, true, s.equal)
 	s.rebuildIndexLocked()
 }
 
@@ -243,7 +227,7 @@ func (s *Set[T]) RetainAll(items ...T) {
 func (s *Set[T]) Filter(predicate func(T) bool) *Set[T] {
 	snapshot := s.GetData()
 
-	newSet := NewSet[T](s.hashFunc)
+	newSet := newSetWithHash(s.hashFunc, s.scanOnHashMiss)
 
 	for _, item := range snapshot {
 		if predicate(item) {
@@ -259,7 +243,7 @@ func (s *Set[T]) Copy() *Set[T] {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	copySet := NewSet[T](s.hashFunc)
+	copySet := newSetWithHash(s.hashFunc, s.scanOnHashMiss)
 
 	for _, item := range s.data {
 		copySet.Add(item)
@@ -272,7 +256,7 @@ func (s *Set[T]) Copy() *Set[T] {
 func (s *Set[T]) DeepCopy(cloneFunc func(T) T) *Set[T] {
 	snapshot := s.GetData()
 
-	copySet := NewSet[T](s.hashFunc)
+	copySet := newSetWithHash(s.hashFunc, s.scanOnHashMiss)
 
 	for _, item := range snapshot {
 		copySet.Add(cloneFunc(item))
@@ -286,7 +270,7 @@ func (s *Set[T]) ToList() *List[T] {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	list := NewList[T](s.hashFunc)
+	list := newListWithHash(s.hashFunc, s.scanOnHashMiss)
 	for _, item := range s.data {
 		list.Add(item)
 	}
