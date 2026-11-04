@@ -118,32 +118,25 @@ func getYamlValue(key string) interface{} {
 	if !(strings.HasPrefix(key, "${") && strings.HasSuffix(key, "}")) {
 		panic("key must start with ${ and end with }")
 	}
-	key = key[2 : len(key)-1]
-	arr := strings.Split(key, ".")
-	val := applicationYml[arr[0]]
-	val2 := applicationChildYml[arr[0]]
-	if len(arr) == 1 {
-		if val2 == nil {
-			return val
-		}
-		return val2
+	path := strings.Split(key[2:len(key)-1], ".")
+	// Child non-nil values win, including false, zero, and empty strings.
+	// Missing paths and explicit YAML null preserve the existing parent fallback.
+	if value := lookupYamlPath(applicationChildYml, path); value != nil {
+		return value
 	}
+	return lookupYamlPath(applicationYml, path)
+}
 
-	for i := 1; i < len(arr); i++ {
-		tmp := arr[i]
-		if val != nil {
-			v := val.(map[string]interface{})
-			val = v[tmp]
+func lookupYamlPath(config map[string]interface{}, path []string) interface{} {
+	var value interface{} = config
+	for _, part := range path {
+		mapping, ok := value.(map[string]interface{})
+		if !ok {
+			return nil
 		}
-		if val2 != nil {
-			v := val2.(map[string]interface{})
-			val2 = v[tmp]
-		}
+		value = mapping[part]
 	}
-	if val2 == nil {
-		return val
-	}
-	return val2
+	return value
 }
 
 // yamlIntegerValue preserves integer width and rejects conversion overflow.
