@@ -106,6 +106,15 @@ type snowflake struct {
 	workerId      int64
 	lastTimestamp int64
 	sequence      int64
+	// Set only when constructing an instance; nil uses the wall clock.
+	nowMillis func() int64
+}
+
+func (s *snowflake) currentMillis() int64 {
+	if s.nowMillis != nil {
+		return s.nowMillis()
+	}
+	return time.Now().UnixNano() / 1e6
 }
 
 // NextID 生成下一个ID
@@ -113,34 +122,44 @@ func (s *snowflake) nextID() (int64, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	timestamp := time.Now().UnixNano() / 1e6 // 毫秒级时间戳
+	timestamp := s.currentMillis()
 
 	if timestamp < s.lastTimestamp {
 		return 0, errTimeBackwards
 	}
 
+	sequence := int64(0)
 	if timestamp == s.lastTimestamp {
-		s.sequence = (s.sequence + 1) & sequenceMask
-		if s.sequence == 0 {
-			timestamp = tilNextMillis(s.lastTimestamp)
+		sequence = (s.sequence + 1) & sequenceMask
+		if sequence == 0 {
+			var err error
+			timestamp, err = s.tilNextMillis(s.lastTimestamp)
+			if err != nil {
+				return 0, err
+			}
 		}
-	} else {
-		s.sequence = 0
 	}
 
+	// Do not reset an exhausted sequence if waiting fails: retrying in the same
+	// millisecond must wait again, rather than reuse already-issued sequence values.
 	s.lastTimestamp = timestamp
+	s.sequence = sequence
 
 	return (timestamp << timestampShift) |
 		(s.workerId << workerShift) |
 		s.sequence, nil
 }
 
-func tilNextMillis(lastTimestamp int64) int64 {
-	timestamp := time.Now().UnixNano() / 1e6
-	for timestamp <= lastTimestamp {
-		timestamp = time.Now().UnixNano() / 1e6
+func (s *snowflake) tilNextMillis(lastTimestamp int64) (int64, error) {
+	for {
+		timestamp := s.currentMillis()
+		if timestamp < lastTimestamp {
+			return 0, errTimeBackwards
+		}
+		if timestamp > lastTimestamp {
+			return timestamp, nil
+		}
 	}
-	return timestamp
 }
 
 func newSnowflake() (*snowflake, error) {
