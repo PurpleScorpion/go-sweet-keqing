@@ -42,7 +42,13 @@ func ValueInt32(key string) int32 {
 }
 
 func ValueFloat32(key string) float32 {
-	return float32(ValueFloat64(key))
+	value := ValueFloat64(key)
+	result := float32(value)
+	// Preserve explicit infinities and NaN, but reject finite conversion overflow.
+	if math.IsInf(float64(result), 0) && !math.IsInf(value, 0) {
+		panic(fmt.Sprintf("YAML value %s is outside float32 range", key))
+	}
+	return result
 }
 
 func ValueFloat64(key string) float64 {

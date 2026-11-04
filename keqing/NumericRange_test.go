@@ -121,3 +121,36 @@ func TestIssue08RandomWideInterval(t *testing.T) {
 		valuesMustPanic(t, func() { RandomNextInt(int64(3000000000)) })
 	}
 }
+
+func TestIssue08YAMLFloat32Range(t *testing.T) {
+	oldParent, oldChild := applicationYml, applicationChildYml
+	t.Cleanup(func() { applicationYml, applicationChildYml = oldParent, oldChild })
+	read := func(value float64) float32 {
+		t.Helper()
+		if err := LoadYml(map[string]interface{}{"v": value}, map[string]interface{}{}); err != nil {
+			t.Fatal(err)
+		}
+		return ValueFloat32("${v}")
+	}
+	for _, value := range []float64{0, 1.25, -1.25, math.MaxFloat32, -math.MaxFloat32} {
+		if got := read(value); got != float32(value) {
+			t.Errorf("ValueFloat32(%g) = %g, want %g", value, got, float32(value))
+		}
+	}
+	// Values just above MaxFloat32 that still round to a finite float32 are valid.
+	if got := read(math.Nextafter(float64(math.MaxFloat32), math.Inf(1))); got != math.MaxFloat32 {
+		t.Errorf("finite boundary rounding = %g", got)
+	}
+	for _, value := range []float64{1e100, -1e100, math.MaxFloat64, -math.MaxFloat64, math.Ldexp(1, 128), -math.Ldexp(1, 128)} {
+		valuesMustPanic(t, func() { read(value) })
+	}
+	// Explicit non-finite values retain the general ParseFloat contract.
+	if !math.IsNaN(float64(read(math.NaN()))) {
+		t.Error("explicit NaN changed")
+	}
+	for _, sign := range []int{1, -1} {
+		if got := read(math.Inf(sign)); !math.IsInf(float64(got), sign) {
+			t.Errorf("explicit Inf(%d) changed: %g", sign, got)
+		}
+	}
+}
