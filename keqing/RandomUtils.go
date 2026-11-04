@@ -229,6 +229,9 @@ func isInt(v interface{}) (bool, int) {
 	case int32:
 		return true, int(val)
 	case int64:
+		if int64(int(val)) != val {
+			panic("random integer argument is outside int range")
+		}
 		return true, int(val)
 	default:
 		return false, 0
@@ -236,9 +239,24 @@ func isInt(v interface{}) (bool, int) {
 }
 
 func nextInt2(min, max int) int {
+	if min >= max {
+		panic("random interval must have min < max")
+	}
 	mu.Lock()
 	defer mu.Unlock()
-	return rng.Intn(max-min) + min
+	// Unsigned subtraction also represents intervals wider than MaxInt.
+	width := uint(max) - uint(min)
+	if width <= uint(^uint(0)>>1) {
+		return rng.Intn(int(width)) + min
+	}
+	// Reject the incomplete modulo bucket to preserve uniform sampling.
+	threshold := -width % width
+	for {
+		n := uint(rng.Uint64())
+		if n >= threshold {
+			return int(uint(min) + n%width)
+		}
+	}
 }
 
 func nextInt1(num int) int {

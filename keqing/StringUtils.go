@@ -425,33 +425,55 @@ func ParseInt64(str string) int64 {
 	if err != nil {
 		panic(str + " Cannot be converted to int64 type")
 	}
-	return num
+	return int64(num)
 }
 
 func ParseInt32(str string) int32 {
-	return int32(ParseInt64(str))
+	num, err := strconv.ParseInt(str, 10, 32)
+	if err != nil {
+		panic(str + " Cannot be converted to int32 type")
+	}
+	return int32(num)
 }
 
 func ParseInt16(str string) int16 {
-	return int16(ParseInt64(str))
+	num, err := strconv.ParseInt(str, 10, 16)
+	if err != nil {
+		panic(str + " Cannot be converted to int16 type")
+	}
+	return int16(num)
 }
 
 func ParseInt8(str string) int8 {
-	return int8(ParseInt64(str))
+	num, err := strconv.ParseInt(str, 10, 8)
+	if err != nil {
+		panic(str + " Cannot be converted to int8 type")
+	}
+	return int8(num)
 }
 
 func ParseInt(str string) int {
-	return int(ParseInt64(str))
+	num, err := strconv.ParseInt(str, 10, strconv.IntSize)
+	if err != nil {
+		panic(str + " Cannot be converted to int type")
+	}
+	return int(num)
 }
 
 func ParseFloat32(dataStr string) float32 {
-	f, _ := strconv.ParseFloat(dataStr, 32)
+	f, err := strconv.ParseFloat(dataStr, 32)
+	if err != nil {
+		panic(dataStr + " Cannot be converted to float32 type")
+	}
 	return float32(f)
 }
 
 func ParseFloat64(dataStr string) float64 {
-	f, _ := strconv.ParseFloat(dataStr, 64)
-	return f
+	f, err := strconv.ParseFloat(dataStr, 64)
+	if err != nil {
+		panic(dataStr + " Cannot be converted to float64 type")
+	}
+	return float64(f)
 }
 
 func Split(str string, sep string) []string {

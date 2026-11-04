@@ -196,16 +196,16 @@ func SortArrayDesc(obj interface{}) {
 		return
 	case reflect.Int64:
 		// 如果是 int64 切片，则进行倒序排序
-		slice := make([]int, val.Len())
+		slice := make([]int64, val.Len())
 		for i := 0; i < val.Len(); i++ {
-			slice[i] = int(val.Index(i).Int())
+			slice[i] = val.Index(i).Int()
 		}
 		sort.Slice(slice, func(i, j int) bool {
 			return slice[i] > slice[j]
 		})
 		// 将排序后的切片替换到原始切片中
 		for i := 0; i < val.Len(); i++ {
-			val.Index(i).SetInt(int64(slice[i]))
+			val.Index(i).SetInt(slice[i])
 		}
 		return
 	case reflect.Float32:
@@ -300,14 +300,14 @@ func SortArray(obj interface{}) {
 		return
 	case reflect.Int64:
 		// 如果是 int 切片，则进行排序
-		slice := make([]int, val.Len())
+		slice := make([]int64, val.Len())
 		for i := 0; i < val.Len(); i++ {
-			slice[i] = int(val.Index(i).Int())
+			slice[i] = val.Index(i).Int()
 		}
-		sort.Ints(slice)
+		sort.Slice(slice, func(i, j int) bool { return slice[i] < slice[j] })
 		// 将排序后的切片替换到原始切片中
 		for i := 0; i < val.Len(); i++ {
-			val.Index(i).SetInt(int64(slice[i]))
+			val.Index(i).SetInt(slice[i])
 		}
 		return
 	case reflect.Float32:
