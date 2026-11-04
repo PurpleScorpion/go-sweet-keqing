@@ -6,23 +6,26 @@ import (
 
 // Set 是一个线程安全、可自定义 hash 函数的集合结构
 type Set[T comparable] struct {
-	data     []T
-	hashMap  map[uint64][]int
-	hashFunc func(T) uint64
-	mu       sync.RWMutex
+	data           []T
+	hashMap        map[uint64][]int
+	hashFunc       func(T) uint64
+	scanOnHashMiss bool
+	mu             sync.RWMutex
 }
 
 // NewSet 创建一个新的 Set，可以传入自定义 hash 函数（可为 nil）
 func NewSet[T comparable](hashFunc func(T) uint64) *Set[T] {
+	scanOnHashMiss := collectionNeedsHashScan[T](hashFunc != nil)
 	if hashFunc == nil {
 		hashFunc = func(t T) uint64 {
 			return defaultHash(t)
 		}
 	}
 	return &Set[T]{
-		data:     make([]T, 0),
-		hashMap:  make(map[uint64][]int),
-		hashFunc: hashFunc,
+		data:           make([]T, 0),
+		hashMap:        make(map[uint64][]int),
+		hashFunc:       hashFunc,
+		scanOnHashMiss: scanOnHashMiss,
 	}
 }
 
@@ -47,14 +50,23 @@ func (s *Set[T]) Contains(value T) bool {
 }
 
 func (s *Set[T]) indexOfLocked(value T) int {
+	return s.indexOfByLocked(value, s.equal)
+}
+
+// Keep the lookup algorithm separate from equality so its comparison budget can
+// be verified without substituting an Equal method that changes the key contract.
+func (s *Set[T]) indexOfByLocked(value T, equal func(T, T) bool) int {
 	for _, idx := range s.hashMap[s.hashFunc(value)] {
-		if s.equal(s.data[idx], value) {
+		if equal(s.data[idx], value) {
 			return idx
 		}
 	}
-	// Equal may match across hashes, and a stored pointer's fields may change.
+	if !s.scanOnHashMiss {
+		return -1
+	}
+	// Equal may match across hashes, and a custom hash may inspect changed fields.
 	for idx, item := range s.data {
-		if s.equal(item, value) {
+		if equal(item, value) {
 			return idx
 		}
 	}
