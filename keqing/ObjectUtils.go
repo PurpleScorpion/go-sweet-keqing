@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-// 将 interface{} 转换为指定的切片类型
+// 将 interface{} 转换为指定的切片类型；nil 切片指针返回 nil，nil 元素转换为 T 的零值。
 func ToArray[T any](data interface{}) []T {
 	if data == nil {
 		return nil
@@ -13,6 +13,9 @@ func ToArray[T any](data interface{}) []T {
 
 	// 情况 1: data 是 *[]T
 	if ptr, ok := data.(*[]T); ok {
+		if ptr == nil {
+			return nil
+		}
 		return *ptr
 	}
 
@@ -20,7 +23,9 @@ func ToArray[T any](data interface{}) []T {
 	if ptrList, ok := data.([]*T); ok {
 		res := make([]T, len(ptrList))
 		for i := range ptrList {
-			res[i] = *ptrList[i]
+			if ptrList[i] != nil {
+				res[i] = *ptrList[i]
+			}
 		}
 		return res
 	}
@@ -48,46 +53,39 @@ func ToObject[T any](data interface{}) T {
 
 // CopyProperties 将 src 结构体的字段复制到 dst 结构体中（字段名相同），可指定忽略字段
 func CopyProperties(dst, src interface{}, ignoreFields ...string) error {
-	// 构建忽略字段的 map，提升查找效率
-	ignoreMap := make(map[string]struct{})
-	for _, field := range ignoreFields {
-		ignoreMap[field] = struct{}{}
+	dstVal := reflect.ValueOf(dst)
+	if !dstVal.IsValid() || dstVal.Kind() != reflect.Ptr || dstVal.IsNil() || dstVal.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("dst must be a non-nil pointer to a struct")
 	}
-
-	dstVal := reflect.ValueOf(dst).Elem()
+	dstVal = dstVal.Elem()
 	srcVal := reflect.ValueOf(src)
-
-	// 解除指针指向
 	if srcVal.Kind() == reflect.Ptr {
 		srcVal = srcVal.Elem()
 	}
-
-	// 确保 src 是结构体类型
 	if srcVal.Kind() != reflect.Struct {
 		return fmt.Errorf("src must be a struct")
 	}
-
+	ignoreMap := make(map[string]struct{}, len(ignoreFields))
+	for _, field := range ignoreFields {
+		ignoreMap[field] = struct{}{}
+	}
 	for i := 0; i < srcVal.NumField(); i++ {
-		srcType := srcVal.Type()
-		field := srcType.Field(i)
-		fieldName := field.Name
-
-		// 跳过忽略字段
-		if _, ignored := ignoreMap[fieldName]; ignored {
+		field := srcVal.Type().Field(i)
+		source := srcVal.Field(i)
+		if _, ignored := ignoreMap[field.Name]; ignored || !source.CanInterface() {
 			continue
 		}
-
-		dstField, ok := dstVal.Type().FieldByName(fieldName)
-		if !ok || !dstVal.FieldByName(fieldName).CanSet() {
+		targetField, ok := dstVal.Type().FieldByName(field.Name)
+		if !ok || source.Type() != targetField.Type {
 			continue
 		}
-
-		srcFieldType := srcVal.Field(i).Type()
-		dstFieldType := dstField.Type
-		if srcFieldType == dstFieldType {
-			dstVal.FieldByName(fieldName).Set(srcVal.Field(i))
+		target, err := dstVal.FieldByIndexErr(targetField.Index)
+		if err != nil {
+			return fmt.Errorf("cannot copy field %s: %w", field.Name, err)
+		}
+		if target.CanSet() {
+			target.Set(source)
 		}
 	}
-
 	return nil
 }

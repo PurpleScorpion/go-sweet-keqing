@@ -92,6 +92,9 @@ func ToJsonString(data any) string {
 将 数组 / 结构体 转换为标准字符串打印
 */
 func ToString(obj interface{}) string {
+	if obj == nil {
+		return "null"
+	}
 	if isSlice(obj) {
 		return array2Str(obj)
 	}
@@ -119,6 +122,8 @@ func map2Str(obj interface{}) string {
 
 		// 对 value 做类型判断并递归处理结构体、slice、map 等
 		switch val := value.(type) {
+		case nil:
+			result = append(result, fmt.Sprintf("%s: null", key))
 		case struct{}:
 			result = append(result, fmt.Sprintf("%s: %v", key, struct2Str(val)))
 		case map[string]interface{}:
@@ -146,6 +151,13 @@ func struct2Str(obj interface{}) string {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		value := v.Field(i)
+		if !value.CanInterface() {
+			continue
+		}
+		if value.Kind() == reflect.Interface && value.IsNil() {
+			result = append(result, fmt.Sprintf("%s: null", field.Name))
+			continue
+		}
 		if field.Type.Kind() == reflect.Struct {
 			result = append(result, fmt.Sprintf("%s: %v", field.Name, struct2Str(value.Interface())))
 		} else if isMap(value.Interface()) {
@@ -173,10 +185,14 @@ func array2Str(obj interface{}) string {
 
 	for _, item := range slice {
 		switch v := item.(type) {
+		case nil:
+			result = append(result, "null")
 		case string:
 			result = append(result, fmt.Sprintf(`"%s"`, v))
-		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		case int, int8, int16, int32, int64:
 			result = append(result, strconv.FormatInt(reflect.ValueOf(v).Int(), 10))
+		case uint, uint8, uint16, uint32, uint64:
+			result = append(result, strconv.FormatUint(reflect.ValueOf(v).Uint(), 10))
 		case bool:
 			result = append(result, strconv.FormatBool(v))
 		default:
