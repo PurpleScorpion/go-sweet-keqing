@@ -11,7 +11,7 @@ import (
 
 var (
 	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-	mu  sync.RWMutex
+	mu  sync.Mutex
 )
 
 // WinningRate 随机概率
@@ -178,6 +178,8 @@ func RandomNextInt(args ...interface{}) int {
 
 // Random 生成0-1之间的随机数 [0,1)
 func Random() float64 {
+	mu.Lock()
+	defer mu.Unlock()
 	return rng.Float64()
 }
 
@@ -211,13 +213,13 @@ func isInt(v interface{}) (bool, int) {
 }
 
 func nextInt2(min, max int) int {
-	mu.RLock()
-	defer mu.RUnlock()
+	mu.Lock()
+	defer mu.Unlock()
 	return rng.Intn(max-min) + min
 }
 
 func nextInt1(num int) int {
-	mu.RLock()
-	defer mu.RUnlock()
+	mu.Lock()
+	defer mu.Unlock()
 	return rng.Intn(num)
 }
