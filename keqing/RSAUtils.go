@@ -9,8 +9,10 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 var (
@@ -64,43 +66,135 @@ func RsaLoadKey(publicKey string, privateKey string, keyType string) error {
  * 生成RSA密钥到指定目录下
  */
 func RsaGenerateKey(path string) string {
-	// 生成RSA密钥对
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	result, err := RsaGenerateKeyWithError(path)
 	if err != nil {
 		panic(err)
 	}
-	// 将私钥编码为PKCS#8格式
-	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
-	if err != nil {
-		panic(err)
-	}
-	privateKeyPEM := &pem.Block{
-		Type:  "PRIVATE KEY",
-		Bytes: privateKeyBytes,
-	}
-	// 提取公钥
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		panic(err)
-	}
-	publicKeyPEM := &pem.Block{
-		Type:  "PUBLIC KEY",
-		Bytes: publicKeyBytes,
-	}
-
-	MkdirAll(path)
-	err = writeToFile(path+"/publicKey.pem", publicKeyPEM)
-	err = writeToFile(path+"/privateKey.pem", privateKeyPEM)
-	return path
+	return result
 }
 
-func writeToFile(filePath string, pemBlock *pem.Block) error {
-	file, err := os.Create(filePath)
+// RsaGenerateKeyWithError creates a new key pair without overwriting either key file.
+// On failure it returns an empty path and removes only files created by this call.
+// Private keys use mode 0600 on Unix; Windows permissions follow the parent ACL.
+func RsaGenerateKeyWithError(path string) (string, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return err
+		return "", fmt.Errorf("generate RSA key: %w", err)
 	}
-	defer file.Close()
-	return pem.Encode(file, pemBlock)
+	privateKeyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return "", fmt.Errorf("encode RSA private key: %w", err)
+	}
+	privateKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: privateKeyBytes,
+	})
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	if err != nil {
+		return "", fmt.Errorf("encode RSA public key: %w", err)
+	}
+	publicKeyPEM := pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: publicKeyBytes,
+	})
+	if err := os.MkdirAll(path, 0700); err != nil {
+		return "", fmt.Errorf("create RSA key directory: %w", err)
+	}
+	if err := createRSAKeyFiles(path, privateKeyPEM, publicKeyPEM, openRSAKeyFile); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+type rsaKeyFile interface {
+	io.Writer
+	Sync() error
+	Close() error
+	Stat() (os.FileInfo, error)
+	Chmod(os.FileMode) error
+}
+
+func openRSAKeyFile(path string, flag int, mode os.FileMode) (rsaKeyFile, error) {
+	return os.OpenFile(path, flag, mode)
+}
+
+// Opening both files exclusively before writing also prevents concurrent calls
+// from replacing an existing pair. Cleanup never includes a failed open.
+func createRSAKeyFiles(path string, privatePEM, publicPEM []byte, openFile func(string, int, os.FileMode) (rsaKeyFile, error)) (err error) {
+	outputs := []struct {
+		path string
+		data []byte
+		mode os.FileMode
+		file rsaKeyFile
+		info os.FileInfo
+	}{
+		{path: filepath.Join(path, "privateKey.pem"), data: privatePEM, mode: 0600},
+		{path: filepath.Join(path, "publicKey.pem"), data: publicPEM, mode: 0644},
+	}
+	defer func() {
+		// Close every handle before cleanup, including on Windows.
+		for _, output := range outputs {
+			if output.file != nil {
+				if closeErr := output.file.Close(); closeErr != nil {
+					err = errors.Join(err, fmt.Errorf("close RSA key %q: %w", output.path, closeErr))
+				}
+			}
+		}
+		if err == nil {
+			return
+		}
+		for _, output := range outputs {
+			if output.file == nil {
+				continue
+			}
+			current, statErr := os.Lstat(output.path)
+			if os.IsNotExist(statErr) {
+				continue
+			}
+			if statErr != nil {
+				err = errors.Join(err, fmt.Errorf("inspect RSA key for cleanup %q: %w", output.path, statErr))
+				continue
+			}
+			// Do not remove a replacement installed by another actor.
+			if output.info == nil || !os.SameFile(output.info, current) {
+				err = errors.Join(err, fmt.Errorf("RSA key %q changed during cleanup; left untouched", output.path))
+				continue
+			}
+			if removeErr := os.Remove(output.path); removeErr != nil {
+				err = errors.Join(err, fmt.Errorf("remove incomplete RSA key %q: %w", output.path, removeErr))
+			}
+		}
+	}()
+	for i := range outputs {
+		output := &outputs[i]
+		file, openErr := openFile(output.path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, output.mode)
+		if openErr != nil {
+			return fmt.Errorf("create RSA key %q: %w", output.path, openErr)
+		}
+		output.file = file
+		output.info, err = file.Stat()
+		if err != nil {
+			return fmt.Errorf("inspect new RSA key %q: %w", output.path, err)
+		}
+		if output.mode == 0600 {
+			if err := file.Chmod(0600); err != nil {
+				return fmt.Errorf("set RSA private key permissions: %w", err)
+			}
+		}
+	}
+	for _, output := range outputs {
+		n, writeErr := output.file.Write(output.data)
+		if writeErr == nil && n != len(output.data) {
+			writeErr = io.ErrShortWrite
+		}
+		if writeErr != nil {
+			return fmt.Errorf("write RSA key %q: %w", output.path, writeErr)
+		}
+		if syncErr := output.file.Sync(); syncErr != nil {
+			return fmt.Errorf("sync RSA key %q: %w", output.path, syncErr)
+		}
+	}
+	return nil
 }
 
 func RsaLoadPrivateKey(privateKeyPEM string) *rsa.PrivateKey {
