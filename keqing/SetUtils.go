@@ -110,43 +110,35 @@ func (s *Set[T]) Clear() {
 	s.hashMap = make(map[uint64][]int)
 }
 
-// Iterator 返回一个只读通道作为迭代器
+// Iterator 返回创建时的浅快照；可提前停止消费，也可在遍历中修改原集合。
 func (s *Set[T]) Iterator() <-chan T {
-	s.mu.RLock()
-	ch := make(chan T)
-	go func() {
-		for _, item := range s.data {
-			ch <- item
-		}
-		close(ch)
-		s.mu.RUnlock()
-	}()
+	// A buffered snapshot needs no producer goroutine or lock after return.
+	snapshot := s.GetData()
+	ch := make(chan T, len(snapshot))
+	for _, item := range snapshot {
+		ch <- item
+	}
+	close(ch)
 	return ch
 }
 
 // Union 求两个集合的并集
 func (s *Set[T]) Union(other *Set[T]) *Set[T] {
-	s.mu.RLock()
-	other.mu.RLock()
-	defer s.mu.RUnlock()
-	defer other.mu.RUnlock()
-
-	union := NewSet[T](s.hashFunc)
-	union.addAll(s.data...)
-	union.addAll(other.data...)
+	left, right := s.GetData(), other.GetData()
+	union := AsSet(left, s.hashFunc)
+	union.addAll(right...)
 	return union
 }
 
 // Intersect 求两个集合的交集
 func (s *Set[T]) Intersect(other *Set[T]) *Set[T] {
-	s.mu.RLock()
-	other.mu.RLock()
-	defer s.mu.RUnlock()
-	defer other.mu.RUnlock()
-
+	left, right := s.GetData(), other.GetData()
+	otherSnapshot := NewSet[T](other.hashFunc)
+	otherSnapshot.data = right
+	otherSnapshot.rebuildIndexLocked()
 	intersection := NewSet[T](s.hashFunc)
-	for _, item := range s.data {
-		if other.indexOfLocked(item) >= 0 {
+	for _, item := range left {
+		if otherSnapshot.Contains(item) {
 			intersection.Add(item)
 		}
 	}
@@ -155,14 +147,13 @@ func (s *Set[T]) Intersect(other *Set[T]) *Set[T] {
 
 // Difference 求两个集合的差集（属于 s 不属于 other 的元素）
 func (s *Set[T]) Difference(other *Set[T]) *Set[T] {
-	s.mu.RLock()
-	other.mu.RLock()
-	defer s.mu.RUnlock()
-	defer other.mu.RUnlock()
-
+	left, right := s.GetData(), other.GetData()
+	otherSnapshot := NewSet[T](other.hashFunc)
+	otherSnapshot.data = right
+	otherSnapshot.rebuildIndexLocked()
 	diff := NewSet[T](s.hashFunc)
-	for _, item := range s.data {
-		if other.indexOfLocked(item) < 0 {
+	for _, item := range left {
+		if !otherSnapshot.Contains(item) {
 			diff.Add(item)
 		}
 	}

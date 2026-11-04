@@ -194,17 +194,15 @@ func (l *List[T]) RemoveAt(index int) bool {
 	return true
 }
 
-// Iterator 返回一个只读通道作为迭代器
+// Iterator 返回创建时的浅快照；可提前停止消费，也可在遍历中修改原集合。
 func (l *List[T]) Iterator() <-chan T {
-	l.mu.RLock()
-	ch := make(chan T)
-	go func() {
-		for _, item := range l.data {
-			ch <- item
-		}
-		close(ch)
-		l.mu.RUnlock()
-	}()
+	// A buffered snapshot needs no producer goroutine or lock after return.
+	snapshot := l.GetData()
+	ch := make(chan T, len(snapshot))
+	for _, item := range snapshot {
+		ch <- item
+	}
+	close(ch)
 	return ch
 }
 
@@ -215,61 +213,43 @@ func (l *List[T]) equal(a, b T) bool {
 
 // Union 返回两个 List 的并集（保留顺序）
 func (l *List[T]) Union(other *List[T]) *List[T] {
-	l.mu.RLock()
-	other.mu.RLock()
-	defer l.mu.RUnlock()
-	defer other.mu.RUnlock()
-
-	union := NewList[T](l.hashFunc)
-
-	// 添加自身元素
-	for _, item := range l.data {
-		union.Add(item)
-	}
-
-	// 添加 other 中未包含的元素
-	for _, item := range other.data {
+	left, right := l.GetData(), other.GetData()
+	union := AsList(left, l.hashFunc)
+	for _, item := range right {
 		if !union.Contains(item) {
 			union.Add(item)
 		}
 	}
-
 	return union
 }
 
 // Intersect 返回两个 List 的交集（保留顺序）
 func (l *List[T]) Intersect(other *List[T]) *List[T] {
-	l.mu.RLock()
-	other.mu.RLock()
-	defer l.mu.RUnlock()
-	defer other.mu.RUnlock()
-
+	left, right := l.GetData(), other.GetData()
+	otherSnapshot := NewList[T](other.hashFunc)
+	otherSnapshot.data = right
+	otherSnapshot.rebuildIndexLocked()
 	intersection := NewList[T](l.hashFunc)
-
-	for _, item := range l.data {
-		if other.Contains(item) {
+	for _, item := range left {
+		if otherSnapshot.Contains(item) {
 			intersection.Add(item)
 		}
 	}
-
 	return intersection
 }
 
 // Difference 返回两个 List 的差集（属于 l 不属于 other 的元素）
 func (l *List[T]) Difference(other *List[T]) *List[T] {
-	l.mu.RLock()
-	other.mu.RLock()
-	defer l.mu.RUnlock()
-	defer other.mu.RUnlock()
-
+	left, right := l.GetData(), other.GetData()
+	otherSnapshot := NewList[T](other.hashFunc)
+	otherSnapshot.data = right
+	otherSnapshot.rebuildIndexLocked()
 	diff := NewList[T](l.hashFunc)
-
-	for _, item := range l.data {
-		if !other.Contains(item) {
+	for _, item := range left {
+		if !otherSnapshot.Contains(item) {
 			diff.Add(item)
 		}
 	}
-
 	return diff
 }
 
