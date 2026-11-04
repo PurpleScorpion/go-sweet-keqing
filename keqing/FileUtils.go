@@ -84,7 +84,7 @@ func SaveFile(path, data string) error {
 }
 
 // CopyFile 保存文件，如果 savePath 的父路径不存在则自动创建
-func CopyFile(filePath, savePath string) error {
+func CopyFile(filePath, savePath string) (err error) {
 	// 创建目标目录（如果不存在）
 	if err := os.MkdirAll(filepath.Dir(savePath), os.ModePerm); err != nil {
 		return fmt.Errorf("无法创建目标目录: %w", err)
@@ -96,13 +96,34 @@ func CopyFile(filePath, savePath string) error {
 		return fmt.Errorf("无法打开源文件: %w", err)
 	}
 	defer srcFile.Close()
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return err
+	}
+	if !srcInfo.Mode().IsRegular() {
+		return errors.New("source is not a regular file")
+	}
 
-	// 创建目标文件
-	dstFile, err := os.Create(savePath)
+	// 先打开而不截断，通过文件身份识别路径别名和硬链接。
+	dstFile, err := os.OpenFile(savePath, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return fmt.Errorf("无法创建目标文件: %w", err)
 	}
-	defer dstFile.Close()
+	defer func() {
+		if closeErr := dstFile.Close(); err == nil && closeErr != nil {
+			err = fmt.Errorf("关闭目标文件失败: %w", closeErr)
+		}
+	}()
+	dstInfo, err := dstFile.Stat()
+	if err != nil {
+		return err
+	}
+	if os.SameFile(srcInfo, dstInfo) {
+		return errors.New("source and destination refer to the same file")
+	}
+	if err := dstFile.Truncate(0); err != nil {
+		return err
+	}
 
 	// 复制文件内容
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
